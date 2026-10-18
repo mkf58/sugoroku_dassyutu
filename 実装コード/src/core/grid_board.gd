@@ -21,11 +21,14 @@ func connect_cells(coord_a: Vector2i, coord_b: Vector2i) -> void:
     if cells.has(coord_a) and cells.has(coord_b):
         cells[coord_a].connections[diff] = true
         cells[coord_b].connections[-diff] = true
+    else:
+        DebugLogger.error("GridBoard.connect_cells", "接続対象のセルが存在しません", {"coord_a": coord_a, "coord_b": coord_b, "has_a": cells.has(coord_a), "has_b": cells.has(coord_b)})
 
 ## 隣接する通行可能な座標リストを取得
 func get_accessible_neighbors(coord: Vector2i) -> Array[Vector2i]:
     var neighbors: Array[Vector2i] = []
     if not cells.has(coord):
+        DebugLogger.warn("GridBoard.get_accessible_neighbors", "指定座標のセルが存在しません", {"coord": coord})
         return neighbors
     var cell = cells[coord]
     for dir in cell.connections.keys():
@@ -37,6 +40,10 @@ func get_accessible_neighbors(coord: Vector2i) -> Array[Vector2i]:
 
 ## 最短経路探索（BFS）: startからgoalまでの座標配列を返す（start含む）
 func find_shortest_path(start: Vector2i, goal: Vector2i) -> Array[Vector2i]:
+    if not cells.has(start) or not cells.has(goal):
+        DebugLogger.warn("GridBoard.find_shortest_path", "開始または終了セルが存在しません", {"start": start, "goal": goal})
+        return []
+        
     if start == goal:
         return [start]
     var queue: Array[Vector2i] = [start]
@@ -52,12 +59,14 @@ func find_shortest_path(start: Vector2i, goal: Vector2i) -> Array[Vector2i]:
                 queue.append(n)
                 
     if not visited.has(goal):
+        DebugLogger.warn("GridBoard.find_shortest_path", "目標への経路が存在しません（孤立または壁）", {"start": start, "goal": goal})
         return []  ## 到達不可
         
     var path: Array[Vector2i] = []
     var curr = goal
     while curr != null:
         path.push_front(curr)
+
         curr = visited[curr]
     return path
 
@@ -111,7 +120,9 @@ func find_path_with_steps(start: Vector2i, goal: Vector2i, steps: int) -> Array[
         for n in get_accessible_neighbors(current):
             var new_path = path.duplicate()
             new_path.append(n)
-            queue.append(new_path)
-            
-    return shortest if not shortest.is_empty() else []
+    if shortest.is_empty():
+        DebugLogger.warn("GridBoard.find_path_with_steps", "指定歩数での有効な経路が見つかりませんでした", {"start": start, "goal": goal, "steps": steps})
+        return []
+    return shortest
+
 

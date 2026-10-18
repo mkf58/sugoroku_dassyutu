@@ -100,8 +100,11 @@ func _bind_events() -> void:
     )
 
 func _on_roll_dice() -> void:
-    if is_moving or tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
-        hud.log_message("[WARN] 現在ダイスを振れません (フェーズ: %s)" % str(tm.current_phase))
+    if is_moving:
+        DebugLogger.warn("MainGame._on_roll_dice", "コマ移動中のためダイスを振れません")
+        return
+    if tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
+        DebugLogger.warn("MainGame._on_roll_dice", "行動選択フェーズ以外ではダイスを振れません", {"phase": tm.current_phase})
         return
         
     current_dice_roll = randi_range(1, 6)
@@ -115,7 +118,7 @@ func _on_roll_dice() -> void:
         
     hud.update_turn_info(tm.current_turn, "移動先をクリック (出目: %d)" % current_dice_roll)
     hud.set_action_buttons_enabled(false)
-    hud.log_message("[Dice] ダイスロール結果: 出目 %d (到達可能マス: %d箇所)" % [current_dice_roll, reachable_cells.size()])
+    DebugLogger.info("MainGame._on_roll_dice", "ダイス出目 %d (到達可能マス: %d箇所)" % [current_dice_roll, reachable_cells.size()])
 
 func _on_cell_hovered(coord: Vector2i) -> void:
     if is_moving or current_dice_roll <= 0:
@@ -127,8 +130,13 @@ func _on_cell_hovered(coord: Vector2i) -> void:
             board_view.update_route_preview(preview_path)
 
 func _on_magic_pressed() -> void:
-    if is_moving or tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
+    if is_moving:
+        DebugLogger.warn("MainGame._on_magic_pressed", "コマ移動中のため魔法を発動できません")
         return
+    if tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
+        DebugLogger.warn("MainGame._on_magic_pressed", "行動選択フェーズ以外では魔法を発動できません", {"phase": tm.current_phase})
+        return
+        
     var hero = tm.characters["HERO"]
     hero.is_burrowed = true
     var piece = board_view.get_piece("HERO")
@@ -136,15 +144,20 @@ func _on_magic_pressed() -> void:
         piece.set_burrowed(true)
     hero.has_acted = true
     hud.update_turn_info(tm.current_turn, "土魔術で地中に潜行した！")
-    hud.log_message("[Magic] 土魔術発動！地中に潜行しました（魔女をやり過ごせます）。")
+    DebugLogger.info("MainGame._on_magic_pressed", "土魔術発動！地中に潜行（魔女やり過ごし有効）")
     _advance_to_enemy_turn()
 
 func _on_wait_pressed() -> void:
-    if is_moving or tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
+    if is_moving:
+        DebugLogger.warn("MainGame._on_wait_pressed", "コマ移動中のため待機できません")
         return
+    if tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
+        DebugLogger.warn("MainGame._on_wait_pressed", "行動選択フェーズ以外では待機できません", {"phase": tm.current_phase})
+        return
+        
     tm.execute_wait("HERO")
     hud.update_turn_info(tm.current_turn, "祈りを捧げて待機した")
-    hud.log_message("[Action] 主人公は祈りを捧げて待機しました。")
+    DebugLogger.info("MainGame._on_wait_pressed", "主人公は祈りを捧げて待機しました")
     _advance_to_enemy_turn()
 
 func _on_cell_clicked(coord: Vector2i) -> void:
@@ -152,16 +165,27 @@ func _on_cell_clicked(coord: Vector2i) -> void:
         var hero_piece = board_view.get_piece("HERO")
         if hero_piece and selected_path.size() > 0:
             hero_piece.skip_current_move(selected_path[-1])
-            hud.log_message("[Skip] クリックにより移動アニメーションをスキップしました。")
+            DebugLogger.info("MainGame._on_cell_clicked", "クリックにより移動アニメーションをスキップ")
         return
 
-    if current_dice_roll > 0 and reachable_cells.has(coord):
-        var hero = tm.characters["HERO"]
-        selected_path = tm.board.find_path_with_steps(hero.current_coord, coord, current_dice_roll)
-        if not selected_path.is_empty():
-            board_view.update_route_preview(selected_path)
-            hud.log_message("[Move] %s へ向けて移動開始 (歩数: %d)" % [str(coord), current_dice_roll])
-            _start_hero_movement(selected_path)
+    if current_dice_roll <= 0:
+        DebugLogger.info("MainGame._on_cell_clicked", "先にダイスを振るかコマンドを選択してください")
+        return
+
+    if not reachable_cells.has(coord):
+        DebugLogger.warn("MainGame._on_cell_clicked", "指定マスはこの出目では移動できません", {"clicked_coord": coord, "dice_roll": current_dice_roll})
+        return
+
+    var hero = tm.characters["HERO"]
+    selected_path = tm.board.find_path_with_steps(hero.current_coord, coord, current_dice_roll)
+    if selected_path.is_empty():
+        DebugLogger.error("MainGame._on_cell_clicked", "移動経路の生成に失敗しました", {"from": hero.current_coord, "to": coord, "steps": current_dice_roll})
+        return
+
+    board_view.update_route_preview(selected_path)
+    DebugLogger.info("MainGame._on_cell_clicked", "移動開始: %s -> %s (歩数: %d)" % [str(hero.current_coord), str(coord), current_dice_roll])
+    _start_hero_movement(selected_path)
+
 
 func _on_right_click() -> void:
     if is_moving:

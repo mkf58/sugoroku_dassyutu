@@ -43,9 +43,17 @@ func start_player_turn() -> void:
 
 func select_character(character_id: String) -> bool:
     if not characters.has(character_id):
+        DebugLogger.error("TurnManager.select_character", "指定されたキャラクターが存在しません", {"id": character_id})
         return false
     var c = characters[character_id]
-    if not c.is_alive or c.has_acted or c.is_skipped:
+    if not c.is_alive:
+        DebugLogger.warn("TurnManager.select_character", "ユニットは死亡中のため選択できません", {"id": character_id, "revive_turns": c.revive_turn_count})
+        return false
+    if c.has_acted:
+        DebugLogger.warn("TurnManager.select_character", "ユニットは既に行動済みです", {"id": character_id})
+        return false
+    if c.is_skipped:
+        DebugLogger.warn("TurnManager.select_character", "ユニットは1回休み状態のため選択できません", {"id": character_id})
         return false
     active_character_id = character_id
     current_phase = Enums.TurnPhase.PLAYER_ACTION_SELECT
@@ -54,9 +62,17 @@ func select_character(character_id: String) -> bool:
 
 ## 1歩ずつの進行とリアルタイム接触・水トラップ判定
 func step_unit(unit: CharacterData, to_coord: Vector2i, remaining_steps: int) -> Dictionary:
+    if unit == null:
+        DebugLogger.error("TurnManager.step_unit", "対象ユニットがnullです")
+        return {"result": "ERROR"}
+    if board == null:
+        DebugLogger.error("TurnManager.step_unit", "盤面 (board) が未設定です")
+        return {"result": "ERROR"}
+        
     var from_coord = unit.current_coord
     unit.current_coord = to_coord
     emit_signal("unit_step_moved", unit.character_id, from_coord, to_coord, remaining_steps)
+
     
     # 1. エネミーとのリアルタイム接触判定
     for enemy in enemies.values():
@@ -113,9 +129,14 @@ func resolve_stop_cell(character: CharacterData, cell: CellData) -> void:
 ## 魔法実行（移動と二者択一）
 func execute_magic(character_id: String, element: Enums.ElementType, target_coord: Vector2i) -> bool:
     if not characters.has(character_id):
+        DebugLogger.error("TurnManager.execute_magic", "詠唱者が存在しません", {"id": character_id})
         return false
     var caster = characters[character_id]
-    if not caster.is_alive or caster.has_acted:
+    if not caster.is_alive:
+        DebugLogger.warn("TurnManager.execute_magic", "死亡中のため魔法を使えません", {"id": character_id})
+        return false
+    if caster.has_acted:
+        DebugLogger.warn("TurnManager.execute_magic", "既に行動済みのため魔法を使えません", {"id": character_id})
         return false
         
     match element:
@@ -132,6 +153,7 @@ func execute_magic(character_id: String, element: Enums.ElementType, target_coor
                 caster.has_acted = true
                 emit_signal("magic_executed", element, character_id, target_coord)
                 return true
+            DebugLogger.warn("TurnManager.execute_magic", "指定座標に対象の魔女が存在しません", {"coord": target_coord})
             return false
             
         Enums.ElementType.WATER:
@@ -143,6 +165,7 @@ func execute_magic(character_id: String, element: Enums.ElementType, target_coor
                 caster.has_acted = true
                 emit_signal("magic_executed", element, character_id, target_coord)
                 return true
+            DebugLogger.error("TurnManager.execute_magic", "指定されたマスが存在しません", {"coord": target_coord})
             return false
             
         Enums.ElementType.EARTH:
@@ -166,7 +189,12 @@ func execute_magic(character_id: String, element: Enums.ElementType, target_coor
             emit_signal("magic_executed", element, character_id, target_coord)
             return true
             
+        _:
+            DebugLogger.error("TurnManager.execute_magic", "未定義の魔法属性です", {"element": element})
+            return false
+            
     return false
+
 
 ## 待機・祈る（潜行中は潜行継続）
 func execute_wait(character_id: String) -> void:

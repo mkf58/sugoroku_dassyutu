@@ -45,12 +45,24 @@ func set_burrowed(burrowed: bool) -> void:
 
 ## Tweenによる経路移動アニメーション
 func animate_path(path: Array[Vector2i], step_callback: Callable, on_complete: Callable) -> void:
+    if path.is_empty():
+        DebugLogger.error("UnitPiece.animate_path", "経路が空です", {"unit_id": unit_id})
+        if on_complete.is_valid():
+            on_complete.call()
+        return
+
+    if not step_callback.is_valid():
+        DebugLogger.error("UnitPiece.animate_path", "step_callbackが無効です", {"unit_id": unit_id})
+    if not on_complete.is_valid():
+        DebugLogger.error("UnitPiece.animate_path", "on_completeが無効です", {"unit_id": unit_id})
+
     current_step_callback = step_callback
     current_complete_callback = on_complete
     remaining_path = path.duplicate()
     
     if path.size() <= 1:
-        on_complete.call()
+        if on_complete.is_valid():
+            on_complete.call()
         return
 
     _play_next_step()
@@ -59,6 +71,8 @@ func _play_next_step() -> void:
     if remaining_path.size() <= 1:
         if current_complete_callback.is_valid():
             current_complete_callback.call()
+        else:
+            DebugLogger.warn("UnitPiece._play_next_step", "移動完了コールバックが無効です", {"unit_id": unit_id})
         return
 
     var _from_c = remaining_path[0]
@@ -66,10 +80,23 @@ func _play_next_step() -> void:
     var remain = remaining_path.size() - 2
     
     # 1歩ごとのロジック判定
+    if not current_step_callback.is_valid():
+        DebugLogger.error("UnitPiece._play_next_step", "step_callbackが無効です", {"unit_id": unit_id, "to_c": to_c})
+        if current_complete_callback.is_valid():
+            current_complete_callback.call()
+        return
+
     var result = current_step_callback.call(to_c, remain)
     var target_pos = Vector2(to_c.x * 64 + 16, to_c.y * 64 + 16)
     
     current_tween = create_tween()
+    if not current_tween:
+        DebugLogger.error("UnitPiece._play_next_step", "Tweenの作成に失敗しました", {"unit_id": unit_id})
+        position = target_pos
+        remaining_path.pop_front()
+        _play_next_step()
+        return
+
     current_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
     current_tween.tween_property(self, "position", target_pos, 0.15)
     
@@ -89,3 +116,6 @@ func skip_current_move(final_coord: Vector2i) -> void:
         position = Vector2(final_coord.x * 64 + 16, final_coord.y * 64 + 16)
         if current_complete_callback.is_valid():
             current_complete_callback.call()
+        else:
+            DebugLogger.warn("UnitPiece.skip_current_move", "スキップ完了時のコールバックが無効です", {"unit_id": unit_id})
+

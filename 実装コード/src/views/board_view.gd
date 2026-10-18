@@ -15,6 +15,13 @@ var piece_nodes: Dictionary = {}  ## unit_id -> UnitPiece
 var hovered_coord: Vector2i = Vector2i(-999, -999)
 
 func setup_board(board: GridBoard, cell_scene: PackedScene) -> void:
+    if not board:
+        DebugLogger.error("BoardView.setup_board", "boardがnullです")
+        return
+    if not cell_scene:
+        DebugLogger.error("BoardView.setup_board", "cell_sceneがnullです")
+        return
+
     for c in cells_container.get_children():
         c.queue_free()
     cell_nodes.clear()
@@ -22,6 +29,9 @@ func setup_board(board: GridBoard, cell_scene: PackedScene) -> void:
     for coord in board.cells.keys():
         var cell_data = board.cells[coord]
         var node = cell_scene.instantiate() as CellNode
+        if not node:
+            DebugLogger.error("BoardView.setup_board", "CellNodeのインスタンス化に失敗しました", {"coord": coord})
+            continue
         cells_container.add_child(node)
         node.setup(cell_data)
         node.clicked.connect(func(c): emit_signal("cell_clicked", c))
@@ -31,14 +41,23 @@ func setup_board(board: GridBoard, cell_scene: PackedScene) -> void:
 
 
 func add_piece(piece_scene: PackedScene, id: String, name: String, coord: Vector2i, is_hero: bool, is_enemy: bool) -> UnitPiece:
+    if not piece_scene:
+        DebugLogger.error("BoardView.add_piece", "piece_sceneがnullです", {"unit_id": id})
+        return null
     var node = piece_scene.instantiate() as UnitPiece
+    if not node:
+        DebugLogger.error("BoardView.add_piece", "UnitPieceのインスタンス化に失敗しました", {"unit_id": id})
+        return null
     pieces_container.add_child(node)
     node.setup(id, name, coord, is_hero, is_enemy)
     piece_nodes[id] = node
     return node
 
 func get_piece(id: String) -> UnitPiece:
-    return piece_nodes.get(id, null)
+    var p = piece_nodes.get(id, null)
+    if not p:
+        DebugLogger.warn("BoardView.get_piece", "指定されたコマが存在しません", {"unit_id": id})
+    return p
 
 func clear_highlights() -> void:
     for node in cell_nodes.values():
@@ -47,6 +66,9 @@ func clear_highlights() -> void:
 func set_cell_highlight(coord: Vector2i, active: bool, color: Color = Color.YELLOW) -> void:
     if cell_nodes.has(coord):
         cell_nodes[coord].set_highlight(active, color)
+    else:
+        DebugLogger.warn("BoardView.set_cell_highlight", "存在しないマスのハイライトが要求されました", {"coord": coord})
+
 
 func update_route_preview(path: Array[Vector2i]) -> void:
     route_preview.clear_points()

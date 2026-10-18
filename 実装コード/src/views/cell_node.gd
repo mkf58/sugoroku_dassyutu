@@ -30,6 +30,9 @@ func _on_mouse_entered() -> void:
         emit_signal("hovered", cell_data.coord)
 
 func setup(p_data: CellData) -> void:
+    if not p_data:
+        DebugLogger.error("CellNode.setup", "CellDataがnullです")
+        return
     cell_data = p_data
     position = Vector2(p_data.coord.x * 64, p_data.coord.y * 64)
     update_visual()
@@ -37,6 +40,7 @@ func setup(p_data: CellData) -> void:
 
 func update_visual() -> void:
     if not cell_data:
+        DebugLogger.warn("CellNode.update_visual", "cell_dataがnullの状態で描画更新が呼ばれました")
         return
     match cell_data.cell_type:
         Enums.CellType.NORMAL:
