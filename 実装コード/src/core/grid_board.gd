@@ -1,0 +1,86 @@
+class_name GridBoard
+extends RefCounted
+
+var cells: Dictionary = {}  ## Vector2i -> CellData
+var grid_size: Vector2i = Vector2i(10, 10)
+var start_coord: Vector2i = Vector2i.ZERO
+var exit_coord: Vector2i = Vector2i.ZERO
+
+func add_cell(cell: CellData) -> void:
+    cells[cell.coord] = cell
+
+func get_cell(coord: Vector2i) -> CellData:
+    return cells.get(coord, null)
+
+func has_cell(coord: Vector2i) -> bool:
+    return cells.has(coord)
+
+## 双方向の隣接接続を設定
+func connect_cells(coord_a: Vector2i, coord_b: Vector2i) -> void:
+    var diff = coord_b - coord_a
+    if cells.has(coord_a) and cells.has(coord_b):
+        cells[coord_a].connections[diff] = true
+        cells[coord_b].connections[-diff] = true
+
+## 隣接する通行可能な座標リストを取得
+func get_accessible_neighbors(coord: Vector2i) -> Array[Vector2i]:
+    var neighbors: Array[Vector2i] = []
+    if not cells.has(coord):
+        return neighbors
+    var cell = cells[coord]
+    for dir in cell.connections.keys():
+        if cell.connections[dir]:
+            var target_coord = coord + dir
+            if cells.has(target_coord):
+                neighbors.append(target_coord)
+    return neighbors
+
+## 最短経路探索（BFS）: startからgoalまでの座標配列を返す（start含む）
+func find_shortest_path(start: Vector2i, goal: Vector2i) -> Array[Vector2i]:
+    if start == goal:
+        return [start]
+    var queue: Array[Vector2i] = [start]
+    var visited: Dictionary = {start: null}
+    
+    while queue.size() > 0:
+        var current = queue.pop_front()
+        if current == goal:
+            break
+        for n in get_accessible_neighbors(current):
+            if not visited.has(n):
+                visited[n] = current
+                queue.append(n)
+                
+    if not visited.has(goal):
+        return []  ## 到達不可
+        
+    var path: Array[Vector2i] = []
+    var curr = goal
+    while curr != null:
+        path.push_front(curr)
+        curr = visited[curr]
+    return path
+
+## 指定歩数（出目）で到達可能なマスの集合を計算（折り返し移動許可）
+## 戻り値: Dictionary (Vector2i -> bool)
+func get_reachable_cells_with_steps(start: Vector2i, steps: int) -> Dictionary:
+    var current_states: Dictionary = {start: true}
+    for s in range(steps):
+        var next_states: Dictionary = {}
+        for c in current_states.keys():
+            for n in get_accessible_neighbors(c):
+                next_states[n] = true
+        current_states = next_states
+    return current_states
+
+## 指定された経路（座標配列）が出目と合致し、接続が有効か検証する
+func validate_path(path: Array[Vector2i], expected_steps: int) -> bool:
+    if path.size() != expected_steps + 1:
+        return false
+    for i in range(path.size() - 1):
+        var c = path[i]
+        var n = path[i + 1]
+        var diff = n - c
+        if not cells.has(c) or not cells[c].connections.get(diff, false):
+            return false
+    return true

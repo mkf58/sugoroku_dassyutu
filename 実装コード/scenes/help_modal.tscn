@@ -1,0 +1,96 @@
+[gd_scene load_steps=2 format=3 uid="uid://bhelpmodal01"]
+
+[ext_resource type="Script" path="res://src/ui/help_modal.gd" id="1_script"]
+
+[node name="HelpModal" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="DimOverlay" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.6)
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -220.0
+offset_right = 300.0
+offset_bottom = 220.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Title" type="Label" parent="Panel"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 15.0
+offset_bottom = 45.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 20
+text = "館の脱出の手引き (マス効果・ルール)"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 60.0
+offset_right = -20.0
+offset_bottom = -60.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Rules" type="Label" parent="Panel/ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "【基本ルール】
+・左クリック：すべて決定・移動
+・右クリック：すべてキャンセル・閉じる
+・移動中にクリック：コマ移動を即座にスキップ
+・魔女に追いつかれると即時捕縛死亡（ゲームオーバー）
+
+【マス種別一覧】
+・通常（黒灰）：何も起きない安全なマス
+・水罠（青）：侵入即停止・ターン終了（突破に丸1ターン消費）
+・宝箱（黄）：アイテム入手
+・+2（水色）：追加で2マス前進
+・戻る（赤）：スタート地点へ強制送還
+・休み（紫）：次ターン行動不能
+・もう1回（青緑）：即座にダイスを追加で振れる
+・EXIT（緑）：ステージクリア・脱出"
+
+[node name="CloseButton" type="Button" parent="Panel"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -60.0
+offset_top = -45.0
+offset_right = 60.0
+offset_bottom = -15.0
+grow_horizontal = 2
+grow_vertical = 0
+text = "閉じる (右クリック)"

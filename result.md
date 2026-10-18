@@ -1,42 +1,43 @@
-# 作業完了報告 (Result)
+# 作業結果サマリー (2026-10-18)
 
-## 1. 実施内容サマリー
-ユーザー様による「ゲーム進行・ターン制御フロー設計書」のレビュー指摘事項（A45）を受け、以下の通り基本設計書および関連仕様を修正・反映いたしました。
+## 実行した内容のサマリー
+ユーザー様のご指示「詳細設計書を作成してからPOCを作成していきましょう」に基づき、TDD-WF（テスト駆動型ウォーターフォール開発）のフローに従って以下の工程を完遂いたしました。
 
-1. **水魔術トラップの挙動是正：**
-   - プレイヤー・魔女を問わず、水魔術マスに足を踏み入れた瞬間に残移動数に関わらず強制停止・即ターンエンドとなるよう修正（実質丸1ターンの足止め）。
-2. **土魔術の潜行状態の継続：**
-   - 潜行中（`is_burrowed = true`）の味方ユニットが「祈る（待機）」を選択した場合、潜行状態を解除せず継続する仕様を確定。移動や魔法使用で地上に出現。
-3. **魔女のターゲット選定優先順位の確定：**
-   - 未潜行の生存味方ユニットから「最短経路距離」が近い対象を最優先で追跡。
-   - 同距離時の優先順位を `主人公 > 炎の少女 > 風の少女 > 水の少女 > 土の少女 > その他の魔法使い` と定義。
-4. **全員潜行時の追跡魔女の挙動：**
-   - 全生存味方が土魔法で潜行中の場合、追跡魔女は見失い、自身の初期配置位置（`initial_coord`）へ向けて最短移動するよう仕様化。
-5. **リアルタイム接触判定（一歩ごと判定）：**
-   - ターン終了時一括判定を廃止し、ユニットが1歩進むごとに主人公/少女と魔女の座標重なりを即座に判定するフローへ是正。
-6. **マス種別の集約・シンプル化：**
-   - 宝箱、石碑、魔術痕跡、解放、介錯などを個別のマス種別とせず、`EVENT` マス（＋`event_id`）に一元化。
-   - 階段マス（フロア遷移）と脱出マス（クリア）を `EXIT` マスに統合。
+1. **新規作業用ブランチの作成：**
+   - 作業ブランチ `feature/detail-design-and-poc` を作成・チェックアウト。
+2. **詳細設計書の策定（`詳細設計/` 配下）：**
+   - [詳細設計/クラス設計_および_データ構造詳細設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/クラス設計_および_データ構造詳細設計書.md)
+     - GDScript 4 による純粋ロジック層とデータ構造、メンバ変数、メソッドシグネチャ、シグナル定義。
+   - [詳細設計/ゲームロジック_および_状態遷移詳細設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/ゲームロジック_および_状態遷移詳細設計書.md)
+     - 1歩ごとの接触即死・水トラップ判定、追跡型魔女AIターゲット選定、4属性魔法、出目折り返し経路計算アルゴリズム。
+   - [詳細設計/UI制御_および_シーン構造詳細設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/UI制御_および_シーン構造詳細設計書.md)
+     - Godotシーンツリー構成、ワンハンドマウス操作体系、Tweenアニメーション＆画面クリック即時スキップ機構。
+   - [詳細設計/単体テスト仕様書_UT.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/単体テスト仕様書_UT.md)
+     - GUTに準拠したテストスイート（UT-BOARD, UT-STEP, UT-ENEMY, UT-MAGIC, UT-TURN）の各ケース仕様（Given/When/Then）。
+3. **単体テストコードの先行作成（`実装コード/tests/` 配下）：**
+   - GUTおよびスタンドアロン実行に対応したテストスイート（`test_case.gd`, `test_grid_board.gd`, `test_step_movement.gd`, `test_enemy_ai.gd`, `test_magic_system.gd`, `test_turn_lifecycle.gd`, `test_runner.gd`）を作成。
+4. **最小PoCプロトタイプの実装（`実装コード/` 配下）：**
+   - `project.godot` を作成し、Godot 4 で直接読み込める完全なプロジェクト構成を整備。
+   - コアロジック層：`enums.gd`, `cell_data.gd`, `character_data.gd`, `enemy_data.gd`, `item_data.gd`, `grid_board.gd`, `turn_manager.gd`
+   - ビュー・UI層：`board_view.gd`, `cell_node.gd`, `unit_piece.gd`, `hud.gd`, `help_modal.gd`, `game_over_screen.gd`, `main_game.gd`
+   - シーンファイル群：`main_game.tscn`, `cell_node.tscn`, `unit_piece.tscn`, `hud.tscn`, `help_modal.tscn`, `game_over_screen.tscn`
 
-## 2. 更新・作成したドキュメント
-- [基本設計/ゲーム進行_および_ターン制御フロー設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/基本設計/ゲーム進行_および_ターン制御フロー設計書.md)
-- [基本設計/データ構造_および_モデル設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/基本設計/データ構造_および_モデル設計書.md)
-- [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md)（Q46追記）
-- [.agent/memory/MEMORY.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.agent/memory/MEMORY.md)（知見更新、旧ファイルアーカイブ）
-- [.agent/handoff/HANDOFF.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.agent/handoff/HANDOFF.md)（新規作成、旧ファイルアーカイブ）
+## プッシュしたブランチ名
+- **ブランチ名：** `feature/detail-design-and-poc`
 
-## 3. プッシュしたブランチ名
-- **ブランチ名：** `feature/turn-flow-design-fix`
+## 更新・反映した主要ドキュメント
+- [詳細設計/クラス設計_および_データ構造詳細設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/クラス設計_および_データ構造詳細設計書.md)
+- [詳細設計/ゲームロジック_および_状態遷移詳細設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/ゲームロジック_および_状態遷移詳細設計書.md)
+- [詳細設計/UI制御_および_シーン構造詳細設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/UI制御_および_シーン構造詳細設計書.md)
+- [詳細設計/単体テスト仕様書_UT.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/単体テスト仕様書_UT.md)
+- [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md)（Q54追記）
+- [.spec/TODO.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/TODO.md)（進捗更新）
+- [.agent/handoff/HANDOFF.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.agent/handoff/HANDOFF.md)（引き継ぎ記録更新）
 
-## 4. 次に行うべき提案（ユーザーへのメッセージ）
-基本設計の全ドキュメントがユーザー様のレビューを経て洗練されたため、次は**詳細設計および最小PoC（概念実証プロトタイプ）開発フェーズ**へ進むことを提案いたします：
-
-1. **最小コアロジックの詳細設計（`詳細設計/`）：**
-   - 直線〜シンプルな2Dグリッド盤面（10マス程度）
-   - 主人公1名、追跡型魔女1体
-   - ダイス移動、1歩ごとの接触判定、水トラップ
-   - マウス操作UI（ワンクリックダイス、右クリック盤面確認モード、ドラッグスクロール、ホイールズーム）
-   - 単体テスト仕様（GUT）
-2. **単体テスト作成＆最小PoC実装（`実装コード/`）：**
-   - 単体テストを作成後、Godot 4で動作プロトタイプを実装
-   - ユーザー様に実際に動かして操作感（手触り）を体験いただき、感触を検証
+## 次に行うべき提案（ユーザーへのメッセージ）
+詳細設計書の策定、先行単体テストコードの作成、およびGodot 4による最小PoCプロトタイプの実装がすべて完了いたしました。
+次に行うべきステップとして、以下を提案いたします：
+1. **結合テスト仕様書およびテストコードの作成（`結合テスト仕様書_および_コード/`）：**
+   - 基本設計書をもとに、結合テスト仕様書および結合テストコードを作成する。
+2. **PoCプロトタイプの操作感・手触りレビュー：**
+   - Godot 4 エディタで `実装コード/scenes/main_game.tscn` を実行いただき、ワンハンド操作（左クリック決定、右クリックキャンセル、クリックスキップ、魔女頭上ターゲット表示等）のテンポ感や手触りについてフィードバックをいただく。
