@@ -69,6 +69,7 @@ func _bind_events() -> void:
     hud.help_pressed.connect(func(): help_modal.open())
     
     board_view.cell_clicked.connect(_on_cell_clicked)
+    board_view.cell_hovered.connect(_on_cell_hovered)
     board_view.right_clicked.connect(_on_right_click)
     
     game_over_screen.retry_pressed.connect(_on_retry)
@@ -100,6 +101,15 @@ func _on_roll_dice() -> void:
     hud.update_turn_info(tm.current_turn, "移動先をクリック (出目: %d)" % current_dice_roll)
     hud.set_action_buttons_enabled(false)
 
+func _on_cell_hovered(coord: Vector2i) -> void:
+    if is_moving or current_dice_roll <= 0:
+        return
+    if reachable_cells.has(coord):
+        var hero = tm.characters["HERO"]
+        var preview_path = tm.board.find_path_with_steps(hero.current_coord, coord, current_dice_roll)
+        if not preview_path.is_empty():
+            board_view.update_route_preview(preview_path)
+
 func _on_magic_pressed() -> void:
     # PoCでは土潜行（魔女やり過ごし）を発動
     if is_moving or tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
@@ -130,15 +140,11 @@ func _on_cell_clicked(coord: Vector2i) -> void:
 
     if current_dice_roll > 0 and reachable_cells.has(coord):
         var hero = tm.characters["HERO"]
-        selected_path = tm.board.find_shortest_path(hero.current_coord, coord)
-        if selected_path.is_empty() or selected_path.size() - 1 != current_dice_roll:
-            # 最短経路と出目が合致しない（折り返し等）場合は補正
-            selected_path = [hero.current_coord]
-            for _i in range(current_dice_roll):
-                selected_path.append(coord) # 簡易補正
-                
-        board_view.update_route_preview(selected_path)
-        _start_hero_movement(selected_path)
+        selected_path = tm.board.find_path_with_steps(hero.current_coord, coord, current_dice_roll)
+        if not selected_path.is_empty():
+            board_view.update_route_preview(selected_path)
+            _start_hero_movement(selected_path)
+
 
 func _on_right_click() -> void:
     if is_moving:

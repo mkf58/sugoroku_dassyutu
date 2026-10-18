@@ -84,3 +84,34 @@ func validate_path(path: Array[Vector2i], expected_steps: int) -> bool:
         if not cells.has(c) or not cells[c].connections.get(diff, false):
             return false
     return true
+
+## startからgoalへ、正確にsteps歩で到達する有効な経路（折り返し含む）を探索する
+func find_path_with_steps(start: Vector2i, goal: Vector2i, steps: int) -> Array[Vector2i]:
+    if steps <= 0:
+        return [start] if start == goal else []
+        
+    # 最短経路と歩数が一致する場合はそれを優先
+    var shortest = find_shortest_path(start, goal)
+    if shortest.size() == steps + 1:
+        return shortest
+        
+    # 折り返し移動を含む歩数固定の探索
+    var queue: Array = [[start]]
+    while queue.size() > 0:
+        var path: Array = queue.pop_front()
+        if path.size() == steps + 1:
+            if path[-1] == goal:
+                var typed_path: Array[Vector2i] = []
+                for p in path:
+                    typed_path.append(p)
+                return typed_path
+            continue
+            
+        var current: Vector2i = path[-1]
+        for n in get_accessible_neighbors(current):
+            var new_path = path.duplicate()
+            new_path.append(n)
+            queue.append(new_path)
+            
+    return shortest if not shortest.is_empty() else []
+

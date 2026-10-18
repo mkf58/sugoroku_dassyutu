@@ -1,16 +1,39 @@
 class_name CellNode
 extends Node2D
 
+signal clicked(coord: Vector2i)
+signal right_clicked()
+signal hovered(coord: Vector2i)
+
 @onready var background: ColorRect = $Background
 @onready var label: Label = $Label
 @onready var highlight: ReferenceRect = $Highlight
 
 var cell_data: CellData
 
+func _ready() -> void:
+    background.gui_input.connect(_on_background_gui_input)
+    background.mouse_entered.connect(_on_mouse_entered)
+    label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+func _on_background_gui_input(event: InputEvent) -> void:
+    if event is InputEventMouseButton and event.pressed:
+        if event.button_index == MOUSE_BUTTON_LEFT:
+            if cell_data:
+                emit_signal("clicked", cell_data.coord)
+        elif event.button_index == MOUSE_BUTTON_RIGHT:
+            emit_signal("right_clicked")
+
+func _on_mouse_entered() -> void:
+    if cell_data:
+        emit_signal("hovered", cell_data.coord)
+
 func setup(p_data: CellData) -> void:
     cell_data = p_data
     position = Vector2(p_data.coord.x * 64, p_data.coord.y * 64)
     update_visual()
+
 
 func update_visual() -> void:
     if not cell_data:

@@ -5,6 +5,7 @@ func run_all() -> void:
     test_find_shortest_path_simple_line()
     test_find_shortest_path_unreachable()
     test_reachable_cells_with_steps_allowing_turnaround()
+    test_find_path_with_steps_turnaround()
 
 ## UT-BOARD-01: 最短経路探索（BFS）の検証
 func test_find_shortest_path_simple_line() -> void:
@@ -53,3 +54,20 @@ func test_reachable_cells_with_steps_allowing_turnaround() -> void:
     assert_true(reachables.has(Vector2i(2, 0)), "UT-BOARD-03: (2,0) should be reachable with 2 steps")
     assert_true(reachables.has(Vector2i(0, 0)), "UT-BOARD-03: (0,0) turnaround should be reachable with 2 steps")
     assert_false(reachables.has(Vector2i(1, 0)), "UT-BOARD-03: (1,0) should not be stopped at with 2 steps")
+
+## UT-BOARD-04: 指定歩数での折り返し経路生成の検証
+func test_find_path_with_steps_turnaround() -> void:
+    var board = GridBoard.new()
+    for x in range(3):
+        board.add_cell(CellData.new(Vector2i(x, 0), Enums.CellType.NORMAL))
+        if x > 0:
+            board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
+            
+    # (0,0) から出目2で (0,0) へ戻る経路
+    var path = board.find_path_with_steps(Vector2i(0, 0), Vector2i(0, 0), 2)
+    assert_eq(path.size(), 3, "UT-BOARD-04: Path size should be 3 for 2 steps turnaround")
+    if path.size() == 3:
+        assert_eq(path[0], Vector2i(0, 0), "UT-BOARD-04: Start at (0,0)")
+        assert_eq(path[1], Vector2i(1, 0), "UT-BOARD-04: Step 1 at (1,0)")
+        assert_eq(path[2], Vector2i(0, 0), "UT-BOARD-04: End at (0,0)")
+

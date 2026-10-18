@@ -2,6 +2,7 @@ class_name BoardView
 extends Node2D
 
 signal cell_clicked(coord: Vector2i)
+signal cell_hovered(coord: Vector2i)
 signal right_clicked()
 signal skip_requested()
 
@@ -23,7 +24,11 @@ func setup_board(board: GridBoard, cell_scene: PackedScene) -> void:
         var node = cell_scene.instantiate() as CellNode
         cells_container.add_child(node)
         node.setup(cell_data)
+        node.clicked.connect(func(c): emit_signal("cell_clicked", c))
+        node.right_clicked.connect(func(): emit_signal("right_clicked"))
+        node.hovered.connect(func(c): emit_signal("cell_hovered", c))
         cell_nodes[coord] = node
+
 
 func add_piece(piece_scene: PackedScene, id: String, name: String, coord: Vector2i, is_hero: bool, is_enemy: bool) -> UnitPiece:
     var node = piece_scene.instantiate() as UnitPiece
