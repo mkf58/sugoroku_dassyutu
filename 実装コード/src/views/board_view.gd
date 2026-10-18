@@ -14,6 +14,18 @@ var cell_nodes: Dictionary = {}   ## Vector2i -> CellNode
 var piece_nodes: Dictionary = {}  ## unit_id -> UnitPiece
 var hovered_coord: Vector2i = Vector2i(-999, -999)
 
+func clear_all() -> void:
+    for c in cells_container.get_children():
+        c.queue_free()
+    cell_nodes.clear()
+    
+    for p in pieces_container.get_children():
+        p.queue_free()
+    piece_nodes.clear()
+    
+    clear_highlights()
+    clear_route_preview()
+
 func setup_board(board: GridBoard, cell_scene: PackedScene) -> void:
     if not board:
         DebugLogger.error("BoardView.setup_board", "boardがnullです")
@@ -22,9 +34,7 @@ func setup_board(board: GridBoard, cell_scene: PackedScene) -> void:
         DebugLogger.error("BoardView.setup_board", "cell_sceneがnullです")
         return
 
-    for c in cells_container.get_children():
-        c.queue_free()
-    cell_nodes.clear()
+    clear_all()
     
     for coord in board.cells.keys():
         var cell_data = board.cells[coord]

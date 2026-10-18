@@ -8,6 +8,7 @@ extends Node2D
 @onready var hud: HUD = $CanvasLayer/HUD
 @onready var help_modal: HelpModal = $CanvasLayer/HelpModal
 @onready var game_over_screen: GameOverScreen = $CanvasLayer/GameOverScreen
+@onready var stage_clear_screen: StageClearScreen = $CanvasLayer/StageClearScreen
 
 var tm: TurnManager
 var current_dice_roll: int = 0
@@ -16,11 +17,18 @@ var selected_path: Array[Vector2i] = []
 var is_moving: bool = false
 
 func _ready() -> void:
-    _init_poc_stage()
     _bind_events()
+    _init_poc_stage()
 
 func _init_poc_stage() -> void:
+    # 既存の盤面表示・ハイライト・経路・コマを完全初期化
+    board_view.clear_all()
+    game_over_screen.visible = false
+    stage_clear_screen.visible = false
+
     tm = TurnManager.new()
+    _bind_turn_manager_events()
+    
     var board = GridBoard.new()
     
     # PoC用盤面（10x6 のグリッド、直線・分岐・水トラップ・宝箱・ゴール）
@@ -67,7 +75,7 @@ func _init_poc_stage() -> void:
     
     hud.update_turn_info(tm.current_turn, "主人公の行動を選択")
     hud.set_action_buttons_enabled(true)
-    hud.log_message("[Stage] PoCステージ開始。主人公: (0,2), 魔女: (6,2)")
+    hud.log_message("[Stage] PoCステージ初期化完了。主人公: (0,2), 魔女: (6,2)")
     hud.log_message("[Turn 1] プレイヤーターン開始。ダイスまたは行動を選択してください。")
 
 func _bind_events() -> void:
@@ -83,6 +91,12 @@ func _bind_events() -> void:
     game_over_screen.retry_pressed.connect(_on_retry)
     game_over_screen.title_pressed.connect(_on_retry)
     
+    stage_clear_screen.retry_pressed.connect(_on_retry)
+    stage_clear_screen.title_pressed.connect(_on_retry)
+
+func _bind_turn_manager_events() -> void:
+    if not tm:
+        return
     tm.game_over_triggered.connect(func(reason):
         hud.set_action_buttons_enabled(false)
         hud.log_message("[GAME OVER] " + reason)
@@ -93,11 +107,13 @@ func _bind_events() -> void:
         hud.update_turn_info(tm.current_turn, "脱出成功！ステージクリア！")
         hud.set_action_buttons_enabled(false)
         hud.log_message("[CLEAR] EXITマスに到達！館からの脱出に成功しました！")
+        stage_clear_screen.show_clear(tm.current_turn)
     )
     
     tm.water_trap_triggered.connect(func(unit_id, coord):
         hud.log_message("[TRAP] %s が水魔術トラップ %s に侵入！残歩数破棄・即ターンエンド" % [unit_id, str(coord)])
     )
+
 
 func _on_roll_dice() -> void:
     if is_moving:
@@ -293,6 +309,8 @@ func _on_enemy_turn_finished() -> void:
 
 func _on_retry() -> void:
     game_over_screen.visible = false
+    stage_clear_screen.visible = false
     hud.set_action_buttons_enabled(true)
     hud.log_message("[Retry] ステージを最初からやり直します。")
     _init_poc_stage()
+
