@@ -1,33 +1,36 @@
-# 作業結果サマリー (2026-10-18)
+# 作業結果サマリー (2026-10-18 本日作業終了・引き継ぎ)
 
 ## 実行した内容のサマリー
-ユーザー様からご指摘いただいた「+2マス（追加移動）の未動作」および「カメラドラッグ操作（右ドラッグへの対応）」の改修を完了いたしました。
+本日はPoCプロトタイプの動作検証・手触り確認をユーザー様と共に行い、ゲームプレイを阻害していた各種課題の解決、操作性の向上、および次回開発に向けたドキュメント整備を完了いたしました。
 
-1. **作業用ブランチの運用：**
-   - 作業ブランチ `fix/gameplay-improvements-and-spec-update` にて継続して改修を実施。
-2. **「+2マス（追加移動）」の機能実装：**
-   - [実装コード/src/core/turn_manager.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/core/turn_manager.gd) の `resolve_stop_cell` に `Enums.CellType.ADDITIONAL_MOVE` の停止時処理を実装。
-   - `signal additional_move_granted(unit_id, steps)` を発火し、[実装コード/src/main_game.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/main_game.gd) で+2の追加出目をセットして即座に次の移動先選択へ連鎖移行するようにいたしました。
-3. **カメラドラッグ操作の改善（右ドラッグへの対応）：**
-   - [実装コード/src/main_game.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/main_game.gd) で右ボタン（`MOUSE_BUTTON_RIGHT`）の長押しドラッグによるカメラパン移動を実装。
-   - ドラッグせずに右クリックだけ（その場で離す）した場合は、通常通りダイス選択の「キャンセル」として動作します。
-   - マスノード（`CellNode`）や `BoardView` による右クリックイベントの横取りを解消し、盤面上のどこからでもスムーズに右ドラッグできるようになりました（中ボタンドラッグも併用可能）。
-4. **管理ドキュメントの更新：**
-   - [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md)（Q63追記）
+1. **エラーロギング機構とワンクリッククリップボードコピーの実装：**
+   - 静的ロガークラス `DebugLogger` (`src/core/debug_logger.gd`) の新設。
+   - 全スクリプトの全関数・ガード節に `[ERROR] [ClassName.method] 詳細 | Context: {...}` ログを配備。
+   - 画面左下の常時ログパネルおよび「📋 ログコピー」ボタン（`DisplayServer.clipboard_set`）による即時共有機能の実装。
+2. **リスタート時の盤面完全初期化およびステージクリア画面の実装：**
+   - `BoardView.clear_all()` により古いコマやハイライトの残存バグを解消。
+   - EXITマス到達時に表示される祝祭感のある専用クリア画面 `StageClearScreen` (`scenes/stage_clear_screen.tscn`) を新設。
+3. **ゲームプレイ操作感・ルールの根本改善：**
+   - **理不尽死の完全根絶：** 未潜行魔女を「進入禁止障害物」として扱い、移動途中で魔女に接触して即死する事故を100%防止。
+   - **1クリック移動の正式化：** 手動の中継マス複数回クリックを全廃し、到達可能マスの一括ハイライト＆目標マス1クリック移動へ基本設計書を改定・統一。
+   - **カメラ操作の刷新：** マウスホイールによる0.5〜2.5倍拡大縮小、右クリック長押しドラッグによる快適なカメラスクロール（クリックのみならキャンセル）を実装。
+   - **魔女の水トラップ停止：** 魔女が水魔術トラップを踏んだ瞬間に即座に停止し行動終了となる処理を実装。
+   - **+2マス（追加移動）の連鎖発動：** `ADDITIONAL_MOVE` マスに停止した際、出目2の追加移動モードへ即時移行する処理を実装。
+4. **セッション終了・引き継ぎドキュメントの更新：**
+   - [.agent/memory/MEMORY.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.agent/memory/MEMORY.md)（最新の設計知見の反映・アーカイブ作成）
+   - [.agent/handoff/HANDOFF.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.agent/handoff/HANDOFF.md)（次回着手タスクの整理・アーカイブ作成）
+   - [.spec/TODO.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/TODO.md)（タスクステータス更新）
+   - [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md)（Q64追記）
 
 ## プッシュしたブランチ名
 - **ブランチ名：** `fix/gameplay-improvements-and-spec-update`
 
-## 更新・反映した主要ドキュメント・ファイル
-- [実装コード/src/core/turn_manager.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/core/turn_manager.gd)
-- [実装コード/src/main_game.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/main_game.gd)
-- [実装コード/src/views/board_view.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/views/board_view.gd)
-- [実装コード/src/views/cell_node.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/views/cell_node.gd)
-- [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md)
+## 次に行うべき提案（次回セッションへのメッセージ）
+本日は長時間の動作確認とたくさんの貴重なフィードバックをいただき、誠にありがとうございました！
+盤面のルール・手触り・カメラ操作などのコア部分が非常にしっかりと整いました。
 
-## 次に行うべき提案（ユーザーへのメッセージ）
-+2マス（追加移動）の連鎖発動と、右ドラッグによる盤面カメラのスクロール操作の実装が完了いたしました。
-Godotで再度ゲームを実行（F5キー）いただき、
-1. マウスの右ボタンを押しながらドラッグして、盤面を快適にスクロールできるか（ドラッグせず右クリックした時はダイス選択キャンセルになるか）
-2. 上側の迂回路にある「+2」マスに止まった際、即座に2マスの追加移動選択が発動するか
-をご確認いただけますと幸いです！
+次回セッションでは、ユーザー様からのご提案通り：
+1. **基本設計に準拠した「行動選択メニューUI（コマンドメニュー）」の本格実装**（現在の簡易HUDボタンから、ユニット選択時に開く洗練されたコマンドポップアップへ刷新）
+2. **宝箱マス（`EVENT`）とダイスアイテム獲得・使用フローの実装**
+3. **マップ移動・フロア遷移の枠組み構築**
+から着手し、本格的なゲームサイクルの完成に向けて開発を進めてまいりましょう！

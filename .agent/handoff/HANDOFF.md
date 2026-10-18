@@ -1,28 +1,33 @@
 # HANDOFF
 
 ## 作業日時
-2026-10-18 21:06
+2026-10-18 22:15
 
 ## 現在のステータス
-- **フェーズ：** 詳細設計完了・単体テスト作成完了・最小PoCプロトタイプ実装完了 → 結合テスト仕様書策定・動作確認待ち
-- **作業ブランチ：** `feature/detail-design-and-poc`
+- **フェーズ：** PoCプロトタイプの操作感・機能改善完了 → 基本設計準拠の行動選択メニューUIおよびマップ移動・宝箱マス実装へ
+- **作業ブランチ：** `fix/gameplay-improvements-and-spec-update`
 
 ## 本日の実施内容サマリー
-1. **詳細設計書の策定（`詳細設計/` 配下）：**
-   - [クラス設計_および_データ構造詳細設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/クラス設計_および_データ構造詳細設計書.md)：GDScript 4による純粋ロジック層とモデル、メソッドシグネチャ、シグナル定義。
-   - [ゲームロジック_および_状態遷移詳細設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/ゲームロジック_および_状態遷移詳細設計書.md)：1歩ごとの接触即死・水トラップ判定、追跡型魔女AIアルゴリズム、4属性魔法、出目折り返し経路計算。
-   - [UI制御_および_シーン構造詳細設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/UI制御_および_シーン構造詳細設計書.md)：Godotシーン構成、ワンハンドマウス操作、Tweenアニメーション＆画面クリックスキップ機構。
-   - [単体テスト仕様書_UT.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/単体テスト仕様書_UT.md)：UT-BOARD, UT-STEP, UT-ENEMY, UT-MAGIC, UT-TURN の各テストケース定義。
-2. **単体テストコードの先行作成（`実装コード/tests/` 配下）：**
-   - GUTおよびスタンドアロン実行に対応したテストスイート（`test_case.gd`, `test_grid_board.gd`, `test_step_movement.gd`, `test_enemy_ai.gd`, `test_magic_system.gd`, `test_turn_lifecycle.gd`, `test_runner.gd`）を作成。
-3. **最小PoCプロトタイプの実装（`実装コード/` 配下）：**
-   - `project.godot` を配置し、Godot 4 で直接読み込み可能な構成を構築。
-   - コアロジック層：`enums.gd`, `cell_data.gd`, `character_data.gd`, `enemy_data.gd`, `item_data.gd`, `grid_board.gd`, `turn_manager.gd`
-   - ビュー・UI層：`board_view.gd`, `cell_node.gd`, `unit_piece.gd`, `hud.gd`, `help_modal.gd`, `game_over_screen.gd`, `main_game.gd`
-   - シーンファイル：`main_game.tscn`, `cell_node.tscn`, `unit_piece.tscn`, `hud.tscn`, `help_modal.tscn`, `game_over_screen.tscn`
+1. **エラーロギング機構とクリップボードコピー機能の実装：**
+   - 静的ロガークラス `DebugLogger` (`src/core/debug_logger.gd`) の新設。
+   - 全スクリプト（`TurnManager`, `GridBoard`, `MainGame`, `UnitPiece`, `BoardView`, `CellNode`）の全関数・ガード節に詳細ログを配備。
+   - 画面左下のデバッグログパネルおよび「📋 ログコピー」ボタン（`DisplayServer.clipboard_set`）の実装。
+2. **リスタート時の盤面初期化およびステージクリア画面の実装：**
+   - `BoardView.clear_all()` によりリトライ時の古いコマ・ハイライト・経路プレビューの完全破棄と `TurnManager` シグナルの再接続を実装。
+   - 専用ステージクリア演出画面 `StageClearScreen` (`scenes/stage_clear_screen.tscn`) を新設。
+3. **ゲームプレイ操作感の根本改善：**
+   - **理不尽死の完全防止：** 未潜行魔女を進入禁止障害物として扱い、移動途中で魔女に接触して即死する事故を根絶。
+   - **基本設計書の正式改定：** 手動の中継マス複数回クリックを全廃し、到達可能マスの一括ハイライト＆目標マス1クリック移動へ統一。
+   - **カメラ操作：** マウスホイールによる0.5〜2.5倍拡大縮小、右クリック長押しドラッグによる盤面スクロール（クリックのみならキャンセル）を実装。
+   - **魔女の水罠停止：** 魔女が水魔術トラップを踏んだ瞬間に即座に移動が停止し、行動終了となる処理を実装。
+   - **+2マス（追加移動）の連鎖実装：** `ADDITIONAL_MOVE` マスに止まった際、即座に出目2がセットされて追加移動モードへ遷移する処理を実装。
 
 ## 次回の作業（引き継ぎ事項）
-1. **結合テスト仕様書およびテストコードの作成（`結合テスト仕様書_および_コード/`）：**
-   - 基本設計書をもとに、結合テスト仕様書（IT-UI, IT-TRN, IT-DAT）および結合テストスクリプトを作成。
-2. **PoCプロトタイプの動作検証・手触り確認：**
-   - Godot 4 エディタでの起動・実行、ワンハンド操作感（左クリック確定、右クリックキャンセル、クリックスキップ、魔女ターゲット表示等）のフィードバック受領と改善。
+ユーザー様のご要望に基づき、次回は以下のタスクから着手する：
+1. **基本設計に合わせた「行動選択メニューUI」の本格実装：**
+   - 現在のHUD下部ボタン群（簡易PoC用）から、基本設計（[画面設計書_および_画面遷移図.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/基本設計/画面設計書_および_画面遷移図.md)）で定義された「キャラ頭上または選択時ポップアップの行動選択メニュー（ダイスを振る／アイテムを使う／魔法を使う／祈る・待機／閉じる）」へ刷新。
+   - これにより、マップ上の味方ユニット選択、盤面確認モード、マップ移動とのシームレスな連携を実現する。
+2. **宝箱マス（`EVENT`）の機能実装：**
+   - 宝箱マスを踏んだ際にダイスアイテム（1〜6の固定賽等）を入手し、インベントリにストックして行動選択メニューから使用できるフローの実装。
+3. **マップ移動・フロア遷移の対応：**
+   - `EXIT` マス到達時の次フロア遷移やステージ切り替えの枠組み整備。

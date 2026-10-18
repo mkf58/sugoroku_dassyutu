@@ -24,33 +24,33 @@ var has_pending_additional_move: bool = false
 var has_pending_roll_again: bool = false
 
 func _unhandled_input(event: InputEvent) -> void:
-    if event is InputEventMouseButton:
-        if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
-            camera.zoom = (camera.zoom * 1.1).clamp(Vector2(0.5, 0.5), Vector2(2.5, 2.5))
-        elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
-            camera.zoom = (camera.zoom / 1.1).clamp(Vector2(0.5, 0.5), Vector2(2.5, 2.5))
-        elif event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
-            if event.pressed:
-                is_dragging_camera = true
-                drag_start_pos = event.position
-                has_dragged_camera = false
-            else:
-                is_dragging_camera = false
-                if event.button_index == MOUSE_BUTTON_RIGHT and not has_dragged_camera:
-                    _on_right_click()
-    elif event is InputEventMouseMotion and is_dragging_camera:
-        if (event.position - drag_start_pos).length() > 4.0:
-            has_dragged_camera = true
-        camera.position -= event.relative / camera.zoom
+	if event is InputEventMouseButton:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
+			camera.zoom = (camera.zoom * 1.1).clamp(Vector2(0.5, 0.5), Vector2(2.5, 2.5))
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+			camera.zoom = (camera.zoom / 1.1).clamp(Vector2(0.5, 0.5), Vector2(2.5, 2.5))
+		elif event.button_index in [MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
+			if event.pressed:
+				is_dragging_camera = true
+				drag_start_pos = event.position
+				has_dragged_camera = false
+			else:
+				is_dragging_camera = false
+				if event.button_index == MOUSE_BUTTON_RIGHT and not has_dragged_camera:
+					_on_right_click()
+	elif event is InputEventMouseMotion and is_dragging_camera:
+		if (event.position - drag_start_pos).length() > 4.0:
+			has_dragged_camera = true
+		camera.position -= event.relative / camera.zoom
 
 func _get_enemy_obstacles() -> Array[Vector2i]:
-    var obstacles: Array[Vector2i] = []
-    var hero = tm.characters.get("HERO", null)
-    if hero and not hero.is_burrowed:
-        for e in tm.enemies.values():
-            if e.is_alive:
-                obstacles.append(e.current_coord)
-    return obstacles
+	var obstacles: Array[Vector2i] = []
+	var hero = tm.characters.get("HERO", null)
+	if hero and not hero.is_burrowed:
+		for e in tm.enemies.values():
+			if e.is_alive:
+				obstacles.append(e.current_coord)
+	return obstacles
 
 
 
@@ -137,44 +137,44 @@ func _bind_events() -> void:
 	stage_clear_screen.title_pressed.connect(_on_retry)
 
 func _bind_turn_manager_events() -> void:
-    if not tm:
-        return
-    tm.game_over_triggered.connect(func(reason):
-        hud.set_action_buttons_enabled(false)
-        hud.log_message("[GAME OVER] " + reason)
-        game_over_screen.show_game_over(reason)
-    )
-    
-    tm.stage_cleared.connect(func(_id):
-        hud.update_turn_info(tm.current_turn, "脱出成功！ステージクリア！")
-        hud.set_action_buttons_enabled(false)
-        hud.log_message("[CLEAR] EXITマスに到達！館からの脱出に成功しました！")
-        stage_clear_screen.show_clear(tm.current_turn)
-    )
-    
-    tm.water_trap_triggered.connect(func(unit_id, coord):
-        hud.log_message("[TRAP] %s が水魔術トラップ %s に侵入！残歩数破棄・即ターンエンド" % [unit_id, str(coord)])
-    )
+	if not tm:
+		return
+	tm.game_over_triggered.connect(func(reason):
+		hud.set_action_buttons_enabled(false)
+		hud.log_message("[GAME OVER] " + reason)
+		game_over_screen.show_game_over(reason)
+	)
+	
+	tm.stage_cleared.connect(func(_id):
+		hud.update_turn_info(tm.current_turn, "脱出成功！ステージクリア！")
+		hud.set_action_buttons_enabled(false)
+		hud.log_message("[CLEAR] EXITマスに到達！館からの脱出に成功しました！")
+		stage_clear_screen.show_clear(tm.current_turn)
+	)
+	
+	tm.water_trap_triggered.connect(func(unit_id, coord):
+		hud.log_message("[TRAP] %s が水魔術トラップ %s に侵入！残歩数破棄・即ターンエンド" % [unit_id, str(coord)])
+	)
 
-    tm.additional_move_granted.connect(func(unit_id, steps):
-        if unit_id == "HERO":
-            has_pending_additional_move = true
-            pending_additional_steps = steps
-    )
+	tm.additional_move_granted.connect(func(unit_id, steps):
+		if unit_id == "HERO":
+			has_pending_additional_move = true
+			pending_additional_steps = steps
+	)
 
-    tm.roll_again_granted.connect(func(unit_id):
-        if unit_id == "HERO":
-            has_pending_roll_again = true
-    )
+	tm.roll_again_granted.connect(func(unit_id):
+		if unit_id == "HERO":
+			has_pending_roll_again = true
+	)
 
-    tm.returned_to_start_applied.connect(func(unit_id):
-        if unit_id == "HERO":
-            var hero = tm.characters["HERO"]
-            var p = board_view.get_piece("HERO")
-            if p:
-                p.position = Vector2(hero.initial_coord.x * 64 + 16, hero.initial_coord.y * 64 + 16)
-            hud.log_message("[Cell] 振り出しマス！スタート位置に戻されました。")
-    )
+	tm.returned_to_start_applied.connect(func(unit_id):
+		if unit_id == "HERO":
+			var hero = tm.characters["HERO"]
+			var p = board_view.get_piece("HERO")
+			if p:
+				p.position = Vector2(hero.initial_coord.x * 64 + 16, hero.initial_coord.y * 64 + 16)
+			hud.log_message("[Cell] 振り出しマス！スタート位置に戻されました。")
+	)
 
 
 
