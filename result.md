@@ -1,35 +1,39 @@
 # 作業結果サマリー (2026-10-18)
 
 ## 実行した内容のサマリー
-ユーザー様からご報告いただいた「リスタート時の盤面未リセット不具合」の是正と、「EXIT到達時のステージクリア専用画面（`StageClearScreen`）」の新規実装を完了いたしました。
+ユーザー様からいただいた4点の改善フィードバック（主人公の理不尽死、1クリック移動への基本設計改定、カメラズーム、魔女の水罠停止）の対応、およびPLAN.mdの表記是正を完了いたしました。
 
 1. **作業用ブランチの運用：**
-   - 新規作業ブランチ `fix/restart-board-reset-and-clear-screen` を切って作業を実施。
-2. **リスタート時の盤面完全リセット処理の実装：**
-   - [実装コード/src/views/board_view.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/views/board_view.gd) に `clear_all()` メソッドを新設。
-   - `cells_container` のマスノードだけでなく、`pieces_container` 配下の既存コマノード（主人公・魔女）の解放（`queue_free`）、ハイライトや経路プレビューの完全クリアを実装。
-   - [実装コード/src/main_game.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/main_game.gd) において、リトライ時のステージ初期化（`_init_poc_stage`）ごとに `TurnManager` のイベントハンドラ（`game_over_triggered`, `stage_cleared` 等）を確実に再バインドする `_bind_turn_manager_events()` を実装。
-3. **ステージクリア専用画面 (`StageClearScreen`) の新設：**
-   - [実装コード/scenes/stage_clear_screen.tscn](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/scenes/stage_clear_screen.tscn) および [実装コード/src/ui/stage_clear_screen.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/ui/stage_clear_screen.gd) を新規作成。
-   - 主人公がEXITマスに到達した際、画面中央にクリア画面がポップアップ表示され、「脱出成功！」のメッセージとクリアまでにかかったターン数が表示されます。
-   - 「もう一度遊ぶ」ボタンを押すことで、盤面が完全にリセットされた状態で何度でも再挑戦できます。
-4. **管理ドキュメントの更新：**
-   - [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md)（Q61追記）
+   - 新規作業ブランチ `fix/gameplay-improvements-and-spec-update` にて作業を実施。
+2. **主人公移動時の理不尽死の完全根絶：**
+   - [実装コード/src/core/grid_board.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/core/grid_board.gd) および [実装コード/src/main_game.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/main_game.gd) において、盤面上の未潜行魔女を「進入禁止障害物」として到達可能マスの探索ロジックに組み込みました。
+   - 魔女のマス、および魔女を跨いで通過する経路は一切ハイライトされなくなり、移動途中の理不尽な捕縛死を100%防止しました。
+3. **基本設計書の改定（1クリック移動の正式化）：**
+   - [基本設計/ゲーム進行_および_ターン制御フロー設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/基本設計/ゲーム進行_および_ターン制御フロー設計書.md)
+   - [基本設計/画面設計書_および_画面遷移図.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/基本設計/画面設計書_および_画面遷移図.md)
+   - 複数回の中継クリック指定を正式に廃止し、到達可能マスの一括ハイライト＆目標マス1クリックによる即時移動仕様に一本化改定。
+4. **マウスホイールによるカメラ拡大縮小（ズーム＆ドラッグ）の実装：**
+   - [実装コード/src/main_game.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/main_game.gd) に `_unhandled_input` を実装。
+   - マウスホイールで0.5倍〜2.5倍のズームイン・ズームアウト、中ボタンドラッグで盤面カメラの自由スクロールが可能になりました。
+5. **魔女の水魔術トラップ停止処理の実装：**
+   - [実装コード/src/main_game.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/main_game.gd) の魔女移動アニメーションにおいて、水トラップを踏んだ瞬間に残歩数を破棄して移動が即停止する処理を実装。
+6. **ドキュメントの表記是正：**
+   - [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md) のQ60において誤記されていた「魔力不足」を「既に行動済みによる魔法不可」へ修正、およびQ62を追記。
 
 ## プッシュしたブランチ名
-- **ブランチ名：** `fix/restart-board-reset-and-clear-screen`
+- **ブランチ名：** `fix/gameplay-improvements-and-spec-update`
 
 ## 更新・反映した主要ドキュメント・ファイル
-- [実装コード/src/views/board_view.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/views/board_view.gd)
+- [実装コード/src/core/grid_board.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/core/grid_board.gd)
 - [実装コード/src/main_game.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/main_game.gd)
-- [実装コード/scenes/main_game.tscn](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/scenes/main_game.tscn)
-- [実装コード/src/ui/stage_clear_screen.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/ui/stage_clear_screen.gd)（新規）
-- [実装コード/scenes/stage_clear_screen.tscn](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/scenes/stage_clear_screen.tscn)（新規）
+- [基本設計/ゲーム進行_および_ターン制御フロー設計書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/基本設計/ゲーム進行_および_ターン制御フロー設計書.md)
+- [基本設計/画面設計書_および_画面遷移図.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/基本設計/画面設計書_および_画面遷移図.md)
 - [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md)
 
 ## 次に行うべき提案（ユーザーへのメッセージ）
-リスタート時の盤面初期化不具合の修正と、EXIT到達時の専用クリア画面の実装が完了いたしました。
-Godotエディタで再度ゲームを実行（F5キー）いただき、
-1. 魔女に捕まってゲームオーバーになった後、「やり直す」を押した際に盤面とコマが綺麗に初期状態に戻るか
-2. EXITマスに到達した際に専用のステージクリア画面が表示され、経過ターン数確認や「もう一度遊ぶ」ができるか
-をご確認いただけますと幸いです。
+4点のフィードバック対応および基本設計書の改定が完了いたしました。
+Godotで実行（F5）いただき、
+1. マウスホイールで盤面の拡大・縮小、中ドラッグで盤面移動ができるか
+2. 魔女を跨ぐような理不尽な死が発生せず、安全にマスを選択できるか
+3. 魔女が水トラップを踏んだ際にその場で確実に停止するか
+をご確認いただけますと幸いです！

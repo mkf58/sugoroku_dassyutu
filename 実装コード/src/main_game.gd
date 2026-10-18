@@ -9,12 +9,35 @@ extends Node2D
 @onready var help_modal: HelpModal = $CanvasLayer/HelpModal
 @onready var game_over_screen: GameOverScreen = $CanvasLayer/GameOverScreen
 @onready var stage_clear_screen: StageClearScreen = $CanvasLayer/StageClearScreen
+@onready var camera: Camera2D = $Camera2D
 
 var tm: TurnManager
 var current_dice_roll: int = 0
 var reachable_cells: Dictionary = {}
 var selected_path: Array[Vector2i] = []
 var is_moving: bool = false
+var is_dragging_camera: bool = false
+
+func _unhandled_input(event: InputEvent) -> void:
+    if event is InputEventMouseButton:
+        if event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
+            camera.zoom = (camera.zoom * 1.1).clamp(Vector2(0.5, 0.5), Vector2(2.5, 2.5))
+        elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+            camera.zoom = (camera.zoom / 1.1).clamp(Vector2(0.5, 0.5), Vector2(2.5, 2.5))
+        elif event.button_index == MOUSE_BUTTON_MIDDLE:
+            is_dragging_camera = event.pressed
+    elif event is InputEventMouseMotion and is_dragging_camera:
+        camera.position -= event.relative / camera.zoom
+
+func _get_enemy_obstacles() -> Array[Vector2i]:
+    var obstacles: Array[Vector2i] = []
+    var hero = tm.characters.get("HERO", null)
+    if hero and not hero.is_burrowed:
+        for e in tm.enemies.values():
+            if e.is_alive:
+                obstacles.append(e.current_coord)
+    return obstacles
+
 
 func _ready() -> void:
     _bind_events()
@@ -127,7 +150,8 @@ func _on_roll_dice() -> void:
     hud.show_dice_result(current_dice_roll)
     
     var hero = tm.characters["HERO"]
-    reachable_cells = tm.board.get_reachable_cells_with_steps(hero.current_coord, current_dice_roll)
+    var obstacles = _get_enemy_obstacles()
+    reachable_cells = tm.board.get_reachable_cells_with_steps(hero.current_coord, current_dice_roll, obstacles)
     board_view.clear_highlights()
     for c in reachable_cells.keys():
         board_view.set_cell_highlight(c, true, Color(0.3, 0.8, 1.0, 0.8))
@@ -141,7 +165,8 @@ func _on_cell_hovered(coord: Vector2i) -> void:
         return
     if reachable_cells.has(coord):
         var hero = tm.characters["HERO"]
-        var preview_path = tm.board.find_path_with_steps(hero.current_coord, coord, current_dice_roll)
+        var obstacles = _get_enemy_obstacles()
+        var preview_path = tm.board.find_path_with_steps(hero.current_coord, coord, current_dice_roll, obstacles)
         if not preview_path.is_empty():
             board_view.update_route_preview(preview_path)
 
@@ -193,10 +218,12 @@ func _on_cell_clicked(coord: Vector2i) -> void:
         return
 
     var hero = tm.characters["HERO"]
-    selected_path = tm.board.find_path_with_steps(hero.current_coord, coord, current_dice_roll)
+    var obstacles = _get_enemy_obstacles()
+    selected_path = tm.board.find_path_with_steps(hero.current_coord, coord, current_dice_roll, obstacles)
     if selected_path.is_empty():
         DebugLogger.error("MainGame._on_cell_clicked", "移動経路の生成に失敗しました", {"from": hero.current_coord, "to": coord, "steps": current_dice_roll})
         return
+
 
     board_view.update_route_preview(selected_path)
     DebugLogger.info("MainGame._on_cell_clicked", "移動開始: %s -> %s (歩数: %d)" % [str(hero.current_coord), str(coord), current_dice_roll])
@@ -265,7 +292,13 @@ func _advance_to_enemy_turn() -> void:
                 actual_path,
                 func(to_c: Vector2i, _rem: int):
                     witch.current_coord = to_c
-                    # 主人公との接触判定
+                    # 1. 水魔術トラップ判定
+                    var cell = tm.board.get_cell(to_c)
+                    if cell and cell.cell_type == Enums.CellType.WATER_TRAP:
+                        hud.log_message("[TRAP] 魔女が水魔術トラップ %s に捕まり、移動が停止した！" % str(to_c))
+                        DebugLogger.info("MainGame._advance_to_enemy_turn", "魔女が水魔術トラップで移動停止", {"coord": to_c})
+                        return {"result": "WATER_TRAP_STOP"}
+                    # 2. 主人公との接触判定
                     var hero = tm.characters["HERO"]
                     if hero.is_alive and hero.current_coord == to_c:
                         if not hero.is_burrowed:
@@ -275,6 +308,7 @@ func _advance_to_enemy_turn() -> void:
                     return {"result": "CONTINUE"},
                 func():
                     _on_enemy_turn_finished()
+
             )
         else:
             hud.log_message("[Enemy] 魔女は移動先がありませんでした。")
