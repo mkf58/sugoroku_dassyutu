@@ -176,3 +176,15 @@
   - 1ターン後：`revive_turn_count == 2`, `is_alive == false`
   - 2ターン後：`revive_turn_count == 1`, `is_alive == false`
   - 3ターン後：`revive_turn_count == 0`, `is_alive == true`, `current_coord == (0,0)` に完全復活すること。
+
+#### 【UT-TURN-02】ターン進行後の味方行動リセットと再選択・行動フェーズ遷移の検証
+- **テスト関数名：** `test_turn_advance_and_reselection()`
+- **前提条件 (Given)：**
+  - 主人公 `HERO` が配置され、1ターン目の行動済み（`has_acted == true`）。
+- **実行操作 (When)：**
+  - ターン終了（`end_turn_and_advance`）を実行し、`select_character("HERO")` を呼び出す。
+- **期待結果 (Then)：**
+  - `current_turn` が 2 に更新されること。
+  - 主人公の `has_acted` が `false` にリセットされること。
+  - 主人公の選択に成功（戻り値 `true`）し、`current_phase` が `PLAYER_ACTION_SELECT` に遷移すること。
+

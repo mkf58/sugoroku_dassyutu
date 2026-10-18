@@ -13,12 +13,25 @@ signal help_pressed()
 @onready var wait_btn: Button = $ActionPanel/WaitButton
 @onready var help_btn: Button = $TopBar/HelpButton
 @onready var dice_result_label: Label = $DiceResult
+@onready var log_display: Label = $LogPanel/LogDisplay
+
+var log_history: Array[String] = []
 
 func _ready() -> void:
     dice_btn.pressed.connect(func(): emit_signal("roll_dice_pressed"))
     magic_btn.pressed.connect(func(): emit_signal("magic_pressed"))
     wait_btn.pressed.connect(func(): emit_signal("wait_pressed"))
     help_btn.pressed.connect(func(): emit_signal("help_pressed"))
+    if log_display:
+        log_display.text = "ゲーム開始。ダイス移動を選択してください。"
+
+func log_message(msg: String) -> void:
+    print("[GAME] " + msg)
+    log_history.append(msg)
+    if log_history.size() > 8:
+        log_history.pop_front()
+    if log_display:
+        log_display.text = "\n".join(log_history)
 
 func update_turn_info(turn: int, phase_text: String) -> void:
     turn_label.text = "ターン: %d" % turn
@@ -35,3 +48,4 @@ func set_action_buttons_enabled(enabled: bool) -> void:
     dice_btn.disabled = not enabled
     magic_btn.disabled = not enabled
     wait_btn.disabled = not enabled
+
