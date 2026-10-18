@@ -23,11 +23,15 @@ static func warn(func_name: String, message: String, context: Dictionary = {}) -
     _record_log(formatted)
     return formatted
 
-static func info(func_name: String, message: String) -> String:
-    var formatted = "[INFO] [%s] %s" % [func_name, message]
+static func info(func_name: String, message: String, context: Dictionary = {}) -> String:
+    var ctx_str = ""
+    if not context.is_empty():
+        ctx_str = " | Context: %s" % JSON.stringify(context)
+    var formatted = "[INFO] [%s] %s%s" % [func_name, message, ctx_str]
     print(formatted)
     _record_log(formatted)
     return formatted
+
 
 static func _record_log(entry: String) -> void:
     log_buffer.append(entry)
