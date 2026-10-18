@@ -94,5 +94,4 @@ func _unhandled_input(event: InputEvent) -> void:
             var local_pos = to_local(get_global_mouse_position())
             var coord = Vector2i(int(floor(local_pos.x / 64.0)), int(floor(local_pos.y / 64.0)))
             emit_signal("cell_clicked", coord)
-        elif event.button_index == MOUSE_BUTTON_RIGHT:
-            emit_signal("right_clicked")
+

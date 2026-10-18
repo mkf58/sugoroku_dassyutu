@@ -22,8 +22,7 @@ func _on_background_gui_input(event: InputEvent) -> void:
         if event.button_index == MOUSE_BUTTON_LEFT:
             if cell_data:
                 emit_signal("clicked", cell_data.coord)
-        elif event.button_index == MOUSE_BUTTON_RIGHT:
-            emit_signal("right_clicked")
+
 
 func _on_mouse_entered() -> void:
     if cell_data:

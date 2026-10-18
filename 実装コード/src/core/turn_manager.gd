@@ -13,6 +13,10 @@ signal enemy_step_moved(enemy_id: String, from_coord: Vector2i, to_coord: Vector
 signal magic_executed(element: Enums.ElementType, user_id: String, target_coord: Vector2i)
 signal stage_cleared(stage_id: String)
 signal game_over_triggered(reason: String)
+signal additional_move_granted(unit_id: String, steps: int)
+signal roll_again_granted(unit_id: String)
+signal returned_to_start_applied(unit_id: String)
+
 
 var board: GridBoard
 var characters: Dictionary = {}  ## id -> CharacterData
@@ -115,16 +119,23 @@ func resolve_stop_cell(character: CharacterData, cell: CellData) -> void:
         Enums.CellType.EXIT:
             current_phase = Enums.TurnPhase.STAGE_CLEAR
             emit_signal("stage_cleared", stage_id)
+        Enums.CellType.ADDITIONAL_MOVE:
+            var steps = cell.event_params.get("steps", 2)
+            character.has_acted = false
+            emit_signal("additional_move_granted", character.character_id, steps)
         Enums.CellType.RETURN_TO_START:
             character.current_coord = character.initial_coord
+            emit_signal("returned_to_start_applied", character.character_id)
         Enums.CellType.SKIP_TURN:
             character.is_skipped = true
         Enums.CellType.ROLL_AGAIN:
             character.has_acted = false
+            emit_signal("roll_again_granted", character.character_id)
         Enums.CellType.EVENT:
             if not cell.is_consumed:
                 cell.is_consumed = true
                 emit_signal("cell_event_triggered", cell)
+
 
 ## 魔法実行（移動と二者択一）
 func execute_magic(character_id: String, element: Enums.ElementType, target_coord: Vector2i) -> bool:
