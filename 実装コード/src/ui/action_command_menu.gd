@@ -173,23 +173,36 @@ func _create_placeholder_portrait() -> void:
 	var tex = ImageTexture.create_from_image(img)
 	portrait_rect.texture = tex
 
-func popup_at(target_screen_pos: Vector2) -> void:
+func popup_at_mouse(custom_mouse_pos: Vector2 = Vector2.ZERO) -> void:
 	visible = true
 	var viewport_size = get_viewport_rect().size
+	var mouse_pos = custom_mouse_pos
+	if mouse_pos == Vector2.ZERO:
+		mouse_pos = get_viewport().get_mouse_position()
+	
+	# ダイスボタンの中心がマウス位置に来るように計算
+	# ダイスボタンのローカル座標：左カラム(約124px) + 右カラム内(約135px) = 約260px, y方向は上部マージン+ヘッダーで約70px
+	var dice_local_center = Vector2(260.0, 70.0)
+	if dice_button and dice_button.size != Vector2.ZERO:
+		dice_local_center = dice_button.global_position - global_position + (dice_button.size * 0.5)
+
 	var menu_size = size
 	if menu_size == Vector2.ZERO:
-		menu_size = Vector2(420, 260)
+		menu_size = custom_minimum_size
+
+	var target_pos = mouse_pos - dice_local_center
+	target_pos.x = clamp(target_pos.x, 15.0, max(15.0, viewport_size.x - menu_size.x - 15.0))
+	target_pos.y = clamp(target_pos.y, 55.0, max(55.0, viewport_size.y - menu_size.y - 15.0))
 	
-	# 指定位置（通常はキャラの右隣または頭上）に配置し、画面外にはみ出さないよう調整
-	var pos = target_screen_pos + Vector2(20, -100)
-	pos.x = clamp(pos.x, 20.0, max(20.0, viewport_size.x - menu_size.x - 20.0))
-	pos.y = clamp(pos.y, 60.0, max(60.0, viewport_size.y - menu_size.y - 20.0))
-	
-	global_position = pos
-	DebugLogger.info("ActionCommandMenu", "コマンドメニュー展開: pos=" + str(pos))
+	global_position = target_pos
+	DebugLogger.info("ActionCommandMenu", "マウス位置にダイスボタンを合わせて展開: mouse=" + str(mouse_pos) + ", menu=" + str(target_pos))
+
+func popup_at(target_screen_pos: Vector2) -> void:
+	popup_at_mouse(target_screen_pos)
 
 func close_menu() -> void:
 	if visible:
 		visible = false
 		DebugLogger.info("ActionCommandMenu", "コマンドメニューを閉じました（盤面確認モードへ）")
 		close_pressed.emit()
+

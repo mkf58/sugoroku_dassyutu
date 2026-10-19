@@ -43,6 +43,16 @@ func set_burrowed(burrowed: bool) -> void:
     else:
         modulate = Color(1.0, 1.0, 1.0, 1.0)
 
+func set_active_highlight(active: bool) -> void:
+    if active:
+        # 操作対象キャラは明るく発光
+        scale = Vector2(1.15, 1.15)
+        modulate = Color(1.3, 1.3, 1.1, 1.0)
+    else:
+        scale = Vector2(1.0, 1.0)
+        modulate = Color(0.85, 0.85, 0.85, 1.0)
+
+
 ## Tweenによる経路移動アニメーション
 func animate_path(path: Array[Vector2i], step_callback: Callable, on_complete: Callable) -> void:
     if path.is_empty():

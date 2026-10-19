@@ -217,7 +217,7 @@ func _bind_turn_manager_events() -> void:
 
 
 
-func _show_action_command_menu() -> void:
+func _show_action_command_menu(custom_mouse_pos: Vector2 = Vector2.ZERO) -> void:
 	if is_moving or current_dice_roll > 0:
 		return
 	if tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
@@ -226,19 +226,24 @@ func _show_action_command_menu() -> void:
 	if not hero or not hero.is_alive or hero.has_acted:
 		return
 	
-	# 主人公の画面座標を算出
-	var world_pos = Vector2(hero.current_coord.x * 64 + 32, hero.current_coord.y * 64 + 32)
-	var viewport_size = get_viewport_rect().size
-	var screen_pos = (world_pos - camera.position) * camera.zoom + viewport_size * 0.5
+	# 操作中キャラの発光表示
+	var hero_piece = board_view.get_piece("HERO")
+	if hero_piece:
+		hero_piece.set_active_highlight(true)
 	
 	action_command_menu.setup_unit("HERO", "主人公", "地中潜行", "魔女の接触をやり過ごす", true, hero.is_burrowed, inventory.size())
-	action_command_menu.popup_at(screen_pos)
+	action_command_menu.popup_at_mouse(custom_mouse_pos)
 	hud.update_turn_info(tm.current_turn, "主人公の行動を選択 [右クリック: 盤面確認]")
 	hud.set_action_panel_visible(false)
 
 func _on_command_menu_closed() -> void:
+	# 盤面確認モード時はキャラ発光を標準に戻す
+	var hero_piece = board_view.get_piece("HERO")
+	if hero_piece:
+		hero_piece.set_active_highlight(false)
 	hud.update_turn_info(tm.current_turn, "盤面確認中 [右クリックで行動選択]")
 	DebugLogger.info("MainGame._on_command_menu_closed", "盤面確認モードへ移行")
+
 
 func _on_item_menu_pressed() -> void:
 	action_command_menu.visible = false
@@ -388,9 +393,10 @@ func _on_cell_clicked(coord: Vector2i) -> void:
 func _on_right_click() -> void:
 	if is_moving:
 		return
+	var mouse_pos = get_viewport().get_mouse_position()
 	if item_select_modal.visible:
 		item_select_modal.visible = false
-		_show_action_command_menu()
+		_show_action_command_menu(mouse_pos)
 		return
 	if current_dice_roll > 0:
 		# 移動先選択中ならキャンセルしてメニュー再表示
@@ -400,14 +406,15 @@ func _on_right_click() -> void:
 		board_view.clear_route_preview()
 		hud.hide_dice_result()
 		hud.log_message("[Cancel] 移動先選択をキャンセルしました。")
-		_show_action_command_menu()
+		_show_action_command_menu(mouse_pos)
 		return
 	
 	# 通常時：メニューが開いていれば閉じ、閉じていれば開く
 	if action_command_menu.visible:
 		action_command_menu.close_menu()
 	else:
-		_show_action_command_menu()
+		_show_action_command_menu(mouse_pos)
+
 
 
 func _start_hero_movement(path: Array[Vector2i]) -> void:
@@ -542,4 +549,3 @@ func _on_retry() -> void:
 	hud.set_action_buttons_enabled(true)
 	hud.log_message("[Retry] ステージを最初からやり直します。")
 	_init_poc_stage()
-
