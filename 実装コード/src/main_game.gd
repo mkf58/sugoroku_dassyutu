@@ -9,6 +9,8 @@ extends Node2D
 @onready var help_modal: HelpModal = $CanvasLayer/HelpModal
 @onready var game_over_screen: GameOverScreen = $CanvasLayer/GameOverScreen
 @onready var stage_clear_screen: StageClearScreen = $CanvasLayer/StageClearScreen
+@onready var action_command_menu: ActionCommandMenu = $CanvasLayer/ActionCommandMenu
+@onready var item_select_modal: ItemSelectModal = $CanvasLayer/ItemSelectModal
 @onready var camera: Camera2D = $Camera2D
 
 var tm: TurnManager
@@ -22,6 +24,8 @@ var has_dragged_camera: bool = false
 var pending_additional_steps: int = 0
 var has_pending_additional_move: bool = false
 var has_pending_roll_again: bool = false
+var inventory: Array[Dictionary] = []
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -63,14 +67,26 @@ func _init_poc_stage() -> void:
 	board_view.clear_all()
 	game_over_screen.visible = false
 	stage_clear_screen.visible = false
+	action_command_menu.visible = false
+	item_select_modal.visible = false
 	pending_additional_steps = 0
 	has_pending_additional_move = false
 	has_pending_roll_again = false
 
+	# インベントリ初期化（テスト用に「1の賽」を初期所持）
+	inventory.clear()
+	inventory.append({
+		"id": "DICE_1_INIT",
+		"name": "1の賽",
+		"desc": "出目が必ず【1】になる固定ダイス",
+		"value": 1,
+		"type": "FIXED_DICE",
+		"icon_text": "🎲"
+	})
+
 	tm = TurnManager.new()
 	_bind_turn_manager_events()
 
-	
 	var board = GridBoard.new()
 	
 	# PoC用盤面（10x6 のグリッド、直線・分岐・水トラップ・宝箱・ゴール）
@@ -117,14 +133,28 @@ func _init_poc_stage() -> void:
 	
 	hud.update_turn_info(tm.current_turn, "主人公の行動を選択")
 	hud.set_action_buttons_enabled(true)
+	hud.set_action_panel_visible(false) # 新UIへ移行するため旧パネルは非表示
 	hud.log_message("[Stage] PoCステージ初期化完了。主人公: (0,2), 魔女: (6,2)")
-	hud.log_message("[Turn 1] プレイヤーターン開始。ダイスまたは行動を選択してください。")
+	hud.log_message("[Turn 1] プレイヤーターン開始。行動コマンドを選択してください。")
+	
+	# 行動選択メニューを表示
+	call_deferred("_show_action_command_menu")
 
 func _bind_events() -> void:
 	hud.roll_dice_pressed.connect(_on_roll_dice)
 	hud.magic_pressed.connect(_on_magic_pressed)
 	hud.wait_pressed.connect(_on_wait_pressed)
 	hud.help_pressed.connect(func(): help_modal.open())
+	hud.open_menu_pressed.connect(_show_action_command_menu)
+	
+	action_command_menu.dice_pressed.connect(_on_roll_dice)
+	action_command_menu.item_pressed.connect(_on_item_menu_pressed)
+	action_command_menu.magic_pressed.connect(_on_magic_pressed)
+	action_command_menu.wait_pressed.connect(_on_wait_pressed)
+	action_command_menu.close_pressed.connect(_on_command_menu_closed)
+	
+	item_select_modal.item_selected.connect(_on_item_used)
+	item_select_modal.cancelled.connect(_show_action_command_menu)
 	
 	board_view.cell_clicked.connect(_on_cell_clicked)
 	board_view.cell_hovered.connect(_on_cell_hovered)
@@ -140,12 +170,16 @@ func _bind_turn_manager_events() -> void:
 	if not tm:
 		return
 	tm.game_over_triggered.connect(func(reason):
+		action_command_menu.visible = false
+		item_select_modal.visible = false
 		hud.set_action_buttons_enabled(false)
 		hud.log_message("[GAME OVER] " + reason)
 		game_over_screen.show_game_over(reason)
 	)
 	
 	tm.stage_cleared.connect(func(_id):
+		action_command_menu.visible = false
+		item_select_modal.visible = false
 		hud.update_turn_info(tm.current_turn, "脱出成功！ステージクリア！")
 		hud.set_action_buttons_enabled(false)
 		hud.log_message("[CLEAR] EXITマスに到達！館からの脱出に成功しました！")
@@ -155,6 +189,11 @@ func _bind_turn_manager_events() -> void:
 	tm.water_trap_triggered.connect(func(unit_id, coord):
 		hud.log_message("[TRAP] %s が水魔術トラップ %s に侵入！残歩数破棄・即ターンエンド" % [unit_id, str(coord)])
 	)
+
+	tm.cell_event_triggered.connect(func(cell_data: CellData):
+		_handle_cell_event(cell_data)
+	)
+
 
 	tm.additional_move_granted.connect(func(unit_id, steps):
 		if unit_id == "HERO":
@@ -178,6 +217,79 @@ func _bind_turn_manager_events() -> void:
 
 
 
+func _show_action_command_menu() -> void:
+	if is_moving or current_dice_roll > 0:
+		return
+	if tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
+		return
+	var hero = tm.characters.get("HERO", null)
+	if not hero or not hero.is_alive or hero.has_acted:
+		return
+	
+	# 主人公の画面座標を算出
+	var world_pos = Vector2(hero.current_coord.x * 64 + 32, hero.current_coord.y * 64 + 32)
+	var viewport_size = get_viewport_rect().size
+	var screen_pos = (world_pos - camera.position) * camera.zoom + viewport_size * 0.5
+	
+	action_command_menu.setup_unit("HERO", "主人公", "地中潜行", "魔女の接触をやり過ごす", true, hero.is_burrowed, inventory.size())
+	action_command_menu.popup_at(screen_pos)
+	hud.update_turn_info(tm.current_turn, "主人公の行動を選択 [右クリック: 盤面確認]")
+	hud.set_action_panel_visible(false)
+
+func _on_command_menu_closed() -> void:
+	hud.update_turn_info(tm.current_turn, "盤面確認中 [右クリックで行動選択]")
+	DebugLogger.info("MainGame._on_command_menu_closed", "盤面確認モードへ移行")
+
+func _on_item_menu_pressed() -> void:
+	action_command_menu.visible = false
+	item_select_modal.open(inventory)
+
+func _on_item_used(item_id: String) -> void:
+	var used_item: Dictionary = {}
+	var index_to_remove = -1
+	for i in range(inventory.size()):
+		if inventory[i].get("id", "") == item_id:
+			used_item = inventory[i]
+			index_to_remove = i
+			break
+	if index_to_remove >= 0:
+		inventory.remove_at(index_to_remove)
+	
+	if used_item.is_empty():
+		DebugLogger.error("MainGame._on_item_used", "指定されたアイテムが見つかりません", {"id": item_id})
+		_show_action_command_menu()
+		return
+		
+	var dice_val = used_item.get("value", 1)
+	current_dice_roll = dice_val
+	hud.show_dice_result(current_dice_roll)
+	
+	var hero = tm.characters["HERO"]
+	var obstacles = _get_enemy_obstacles()
+	reachable_cells = tm.board.get_reachable_cells_with_steps(hero.current_coord, current_dice_roll, obstacles)
+	board_view.clear_highlights()
+	for c in reachable_cells.keys():
+		board_view.set_cell_highlight(c, true, Color(0.3, 0.8, 1.0, 0.8))
+		
+	hud.update_turn_info(tm.current_turn, "【%s】使用！移動先をクリック (出目: %d)" % [used_item.get("name", "賽"), current_dice_roll])
+	hud.log_message("[Item] 【%s】を使用！出目 %d が確定しました。(残り所持: %d個)" % [used_item.get("name", "賽"), current_dice_roll, inventory.size()])
+	DebugLogger.info("MainGame._on_item_used", "アイテム使用完了: " + str(used_item.get("name", "")))
+
+func _handle_cell_event(cell_data: CellData) -> void:
+	# 宝箱マスでランダムな固定ダイスを獲得
+	var random_val = randi_range(1, 6)
+	var item_data = {
+		"id": "DICE_%d_%d" % [random_val, Time.get_ticks_msec()],
+		"name": "%dの賽" % random_val,
+		"desc": "出目が必ず【%d】になる固定ダイス" % random_val,
+		"value": random_val,
+		"type": "FIXED_DICE",
+		"icon_text": "🎲"
+	}
+	inventory.append(item_data)
+	hud.log_message("[Chest] 宝箱を開けた！【%dの賽】を手に入れた！(所持: %d個)" % [random_val, inventory.size()])
+	DebugLogger.info("MainGame._handle_cell_event", "宝箱マスでアイテム入手: " + item_data.name)
+
 func _on_roll_dice() -> void:
 	if is_moving:
 		DebugLogger.warn("MainGame._on_roll_dice", "コマ移動中のためダイスを振れません")
@@ -186,6 +298,7 @@ func _on_roll_dice() -> void:
 		DebugLogger.warn("MainGame._on_roll_dice", "行動選択フェーズ以外ではダイスを振れません", {"phase": tm.current_phase})
 		return
 		
+	action_command_menu.visible = false
 	current_dice_roll = randi_range(1, 6)
 	hud.show_dice_result(current_dice_roll)
 	
@@ -218,6 +331,7 @@ func _on_magic_pressed() -> void:
 		DebugLogger.warn("MainGame._on_magic_pressed", "行動選択フェーズ以外では魔法を発動できません", {"phase": tm.current_phase})
 		return
 		
+	action_command_menu.visible = false
 	var hero = tm.characters["HERO"]
 	hero.is_burrowed = true
 	var piece = board_view.get_piece("HERO")
@@ -236,6 +350,7 @@ func _on_wait_pressed() -> void:
 		DebugLogger.warn("MainGame._on_wait_pressed", "行動選択フェーズ以外では待機できません", {"phase": tm.current_phase})
 		return
 		
+	action_command_menu.visible = false
 	tm.execute_wait("HERO")
 	hud.update_turn_info(tm.current_turn, "祈りを捧げて待機した")
 	DebugLogger.info("MainGame._on_wait_pressed", "主人公は祈りを捧げて待機しました")
@@ -250,7 +365,9 @@ func _on_cell_clicked(coord: Vector2i) -> void:
 		return
 
 	if current_dice_roll <= 0:
-		DebugLogger.info("MainGame._on_cell_clicked", "先にダイスを振るかコマンドを選択してください")
+		# コマンド選択前に盤面をクリックした場合はコマンドメニューを開く
+		if not action_command_menu.visible:
+			_show_action_command_menu()
 		return
 
 	if not reachable_cells.has(coord):
@@ -264,24 +381,34 @@ func _on_cell_clicked(coord: Vector2i) -> void:
 		DebugLogger.error("MainGame._on_cell_clicked", "移動経路の生成に失敗しました", {"from": hero.current_coord, "to": coord, "steps": current_dice_roll})
 		return
 
-
 	board_view.update_route_preview(selected_path)
 	DebugLogger.info("MainGame._on_cell_clicked", "移動開始: %s -> %s (歩数: %d)" % [str(hero.current_coord), str(coord), current_dice_roll])
 	_start_hero_movement(selected_path)
 
-
 func _on_right_click() -> void:
 	if is_moving:
 		return
+	if item_select_modal.visible:
+		item_select_modal.visible = false
+		_show_action_command_menu()
+		return
 	if current_dice_roll > 0:
+		# 移動先選択中ならキャンセルしてメニュー再表示
 		current_dice_roll = 0
 		reachable_cells.clear()
 		board_view.clear_highlights()
 		board_view.clear_route_preview()
 		hud.hide_dice_result()
-		hud.set_action_buttons_enabled(true)
-		hud.update_turn_info(tm.current_turn, "主人公の行動を選択")
 		hud.log_message("[Cancel] 移動先選択をキャンセルしました。")
+		_show_action_command_menu()
+		return
+	
+	# 通常時：メニューが開いていれば閉じ、閉じていれば開く
+	if action_command_menu.visible:
+		action_command_menu.close_menu()
+	else:
+		_show_action_command_menu()
+
 
 func _start_hero_movement(path: Array[Vector2i]) -> void:
 	is_moving = true
@@ -401,13 +528,18 @@ func _on_enemy_turn_finished() -> void:
 	selected_path.clear()
 	is_moving = false
 	
-	hud.update_turn_info(tm.current_turn, "主人公の行動を選択")
+	hud.update_turn_info(tm.current_turn, "主人公の行動を選択 [右クリック: 盤面確認]")
 	hud.set_action_buttons_enabled(true)
+	hud.set_action_panel_visible(false)
 	hud.log_message("[Turn %d] プレイヤーターン開始！主人公: %s, 魔女: %s" % [tm.current_turn, str(hero.current_coord), str(tm.enemies["WITCH"].current_coord)])
+	_show_action_command_menu()
 
 func _on_retry() -> void:
 	game_over_screen.visible = false
 	stage_clear_screen.visible = false
+	action_command_menu.visible = false
+	item_select_modal.visible = false
 	hud.set_action_buttons_enabled(true)
 	hud.log_message("[Retry] ステージを最初からやり直します。")
 	_init_poc_stage()
+

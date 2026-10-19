@@ -1,0 +1,252 @@
+[gd_scene load_steps=2 format=3 uid="uid://bactcmdmenu01"]
+
+[ext_resource type="Script" path="res://src/ui/action_command_menu.gd" id="1_script"]
+
+[node name="ActionCommandMenu" type="PanelContainer"]
+custom_minimum_size = Vector2(430, 275)
+offset_right = 430.0
+offset_bottom = 275.0
+mouse_filter = 1
+script = ExtResource("1_script")
+
+[node name="HBox" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="LeftColumn" type="VBoxContainer" parent="HBox"]
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+theme_override_constants/separation = 6
+alignment = 1
+
+[node name="PortraitContainer" type="CenterContainer" parent="HBox/LeftColumn"]
+layout_mode = 2
+
+[node name="PortraitRect" type="TextureRect" parent="HBox/LeftColumn/PortraitContainer"]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CharNameLabel" type="Label" parent="HBox/LeftColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.4, 1)
+theme_override_font_sizes/font_size = 15
+text = "主人公"
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="HBox/LeftColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.8, 0.9, 1)
+theme_override_font_sizes/font_size = 11
+text = "状態: [通常]"
+horizontal_alignment = 1
+
+[node name="VSeparator" type="VSeparator" parent="HBox"]
+layout_mode = 2
+
+[node name="RightColumn" type="VBoxContainer" parent="HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 5
+
+[node name="MenuHeader" type="Label" parent="HBox/RightColumn"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.78, 0.4, 1)
+theme_override_font_sizes/font_size = 13
+text = "【 行動を選択 】"
+
+[node name="DiceButton" type="Button" parent="HBox/RightColumn"]
+custom_minimum_size = Vector2(270, 42)
+layout_mode = 2
+alignment = 0
+
+[node name="HBox" type="HBoxContainer" parent="HBox/RightColumn/DiceButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_right = -6.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+alignment = 0
+
+[node name="Icon" type="Label" parent="HBox/RightColumn/DiceButton/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "🎲"
+
+[node name="VBox" type="VBoxContainer" parent="HBox/RightColumn/DiceButton/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = -2
+alignment = 1
+
+[node name="Title" type="Label" parent="HBox/RightColumn/DiceButton/HBox/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "ダイスを振る"
+
+[node name="Desc" type="Label" parent="HBox/RightColumn/DiceButton/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.7, 0.8, 1)
+theme_override_font_sizes/font_size = 10
+text = "出目分マスを移動する"
+
+[node name="ItemButton" type="Button" parent="HBox/RightColumn"]
+custom_minimum_size = Vector2(270, 42)
+layout_mode = 2
+alignment = 0
+
+[node name="HBox" type="HBoxContainer" parent="HBox/RightColumn/ItemButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_right = -6.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+alignment = 0
+
+[node name="Icon" type="Label" parent="HBox/RightColumn/ItemButton/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "🎒"
+
+[node name="VBox" type="VBoxContainer" parent="HBox/RightColumn/ItemButton/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = -2
+alignment = 1
+
+[node name="Title" type="Label" parent="HBox/RightColumn/ItemButton/HBox/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "アイテムを使う"
+
+[node name="Desc" type="Label" parent="HBox/RightColumn/ItemButton/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.7, 0.8, 1)
+theme_override_font_sizes/font_size = 10
+text = "所持: 0 個"
+
+[node name="MagicButton" type="Button" parent="HBox/RightColumn"]
+custom_minimum_size = Vector2(270, 42)
+layout_mode = 2
+alignment = 0
+
+[node name="HBox" type="HBoxContainer" parent="HBox/RightColumn/MagicButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_right = -6.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+alignment = 0
+
+[node name="Icon" type="Label" parent="HBox/RightColumn/MagicButton/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "✨"
+
+[node name="VBox" type="VBoxContainer" parent="HBox/RightColumn/MagicButton/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = -2
+alignment = 1
+
+[node name="Title" type="Label" parent="HBox/RightColumn/MagicButton/HBox/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "✨ 魔法 (地中潜行)"
+
+[node name="Desc" type="Label" parent="HBox/RightColumn/MagicButton/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.7, 0.8, 1)
+theme_override_font_sizes/font_size = 10
+text = "魔女の接触をやり過ごす"
+
+[node name="WaitButton" type="Button" parent="HBox/RightColumn"]
+custom_minimum_size = Vector2(270, 42)
+layout_mode = 2
+alignment = 0
+
+[node name="HBox" type="HBoxContainer" parent="HBox/RightColumn/WaitButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_right = -6.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+alignment = 0
+
+[node name="Icon" type="Label" parent="HBox/RightColumn/WaitButton/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "🙏"
+
+[node name="VBox" type="VBoxContainer" parent="HBox/RightColumn/WaitButton/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = -2
+alignment = 1
+
+[node name="Title" type="Label" parent="HBox/RightColumn/WaitButton/HBox/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "祈る (待機)"
+
+[node name="Desc" type="Label" parent="HBox/RightColumn/WaitButton/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.7, 0.8, 1)
+theme_override_font_sizes/font_size = 10
+text = "その場で1ターンやり過ごす"
+
+[node name="CloseButton" type="Button" parent="HBox/RightColumn"]
+custom_minimum_size = Vector2(270, 36)
+layout_mode = 2
+alignment = 0
+
+[node name="HBox" type="HBoxContainer" parent="HBox/RightColumn/CloseButton"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_right = -6.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+alignment = 0
+
+[node name="Icon" type="Label" parent="HBox/RightColumn/CloseButton/HBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "👁️"
+
+[node name="VBox" type="VBoxContainer" parent="HBox/RightColumn/CloseButton/HBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = -2
+alignment = 1
+
+[node name="Title" type="Label" parent="HBox/RightColumn/CloseButton/HBox/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "盤面を確認 (閉じる)"
+
+[node name="Desc" type="Label" parent="HBox/RightColumn/CloseButton/HBox/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.7, 0.8, 1)
+theme_override_font_sizes/font_size = 9
+text = "右クリックでも閉じられます"

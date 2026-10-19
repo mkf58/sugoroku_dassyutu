@@ -8,6 +8,8 @@
 [ext_resource type="PackedScene" uid="uid://bhelpmodal01" path="res://scenes/help_modal.tscn" id="6_help"]
 [ext_resource type="PackedScene" uid="uid://bgameover01" path="res://scenes/game_over_screen.tscn" id="7_gameover"]
 [ext_resource type="PackedScene" uid="uid://bclearscrn01" path="res://scenes/stage_clear_screen.tscn" id="8_clear"]
+[ext_resource type="PackedScene" uid="uid://bactcmdmenu01" path="res://scenes/action_command_menu.tscn" id="9_cmdmenu"]
+[ext_resource type="PackedScene" uid="uid://bitemselect01" path="res://scenes/item_select_modal.tscn" id="10_itemselect"]
 
 [node name="MainGame" type="Node2D"]
 script = ExtResource("1_script")
@@ -32,9 +34,16 @@ default_color = Color(1, 0.8, 0.2, 0.8)
 
 [node name="HUD" parent="CanvasLayer" instance=ExtResource("5_hud")]
 
+[node name="ActionCommandMenu" parent="CanvasLayer" instance=ExtResource("9_cmdmenu")]
+visible = false
+
+[node name="ItemSelectModal" parent="CanvasLayer" instance=ExtResource("10_itemselect")]
+visible = false
+
 [node name="HelpModal" parent="CanvasLayer" instance=ExtResource("6_help")]
 
 [node name="GameOverScreen" parent="CanvasLayer" instance=ExtResource("7_gameover")]
 
 [node name="StageClearScreen" parent="CanvasLayer" instance=ExtResource("8_clear")]
+
 

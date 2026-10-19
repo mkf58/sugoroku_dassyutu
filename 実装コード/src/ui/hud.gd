@@ -5,9 +5,11 @@ signal roll_dice_pressed()
 signal magic_pressed()
 signal wait_pressed()
 signal help_pressed()
+signal open_menu_pressed()
 
 @onready var turn_label: Label = $TopBar/TurnLabel
 @onready var phase_label: Label = $TopBar/PhaseLabel
+@onready var action_panel: Control = $ActionPanel
 @onready var dice_btn: Button = $ActionPanel/DiceButton
 @onready var magic_btn: Button = $ActionPanel/MagicButton
 @onready var wait_btn: Button = $ActionPanel/WaitButton
@@ -24,6 +26,7 @@ func _ready() -> void:
     wait_btn.pressed.connect(func(): emit_signal("wait_pressed"))
     help_btn.pressed.connect(func(): emit_signal("help_pressed"))
     copy_log_btn.pressed.connect(_on_copy_log_pressed)
+
     
     # DebugLoggerのログ自動受信
     DebugLogger.on_log_callback = func(entry: String):
@@ -71,4 +74,9 @@ func set_action_buttons_enabled(enabled: bool) -> void:
     dice_btn.disabled = not enabled
     magic_btn.disabled = not enabled
     wait_btn.disabled = not enabled
+
+func set_action_panel_visible(val: bool) -> void:
+    if action_panel:
+        action_panel.visible = val
+
 
