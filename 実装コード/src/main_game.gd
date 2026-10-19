@@ -414,19 +414,13 @@ func _go_back() -> void:
 		DebugLogger.info("MainGame._go_back", "アイテムモーダルからコマンドメニューへ復帰")
 		return
 
-	# 3. 移動先選択中（出目確定後）の場合
+	# 3. 移動先選択中（出目確定後）の場合：出目キャンセルは不可（移動必須）
 	if current_dice_roll > 0:
-		current_dice_roll = 0
-		reachable_cells.clear()
-		board_view.clear_highlights()
-		board_view.clear_route_preview()
-		hud.hide_dice_result()
-		hud.log_message("[Cancel] 移動先選択をキャンセルしました。")
-		_show_action_command_menu(mouse_pos)
-		DebugLogger.info("MainGame._go_back", "移動先選択をキャンセルしてコマンドメニューへ復帰")
+		DebugLogger.info("MainGame._go_back", "出目確定後のためキャンセル不可（移動先を選択してください）")
 		return
 	
 	# 4. コマンドメニューが開いている場合：閉じて盤面確認モードへ
+
 	if action_command_menu and action_command_menu.visible:
 		action_command_menu.close_menu()
 		DebugLogger.info("MainGame._go_back", "コマンドメニューを閉じて盤面確認モードへ")
