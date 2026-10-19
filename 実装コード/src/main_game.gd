@@ -46,6 +46,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if (event.position - drag_start_pos).length() > 4.0:
 			has_dragged_camera = true
 		camera.position -= event.relative / camera.zoom
+	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		_go_back()
+
 
 func _get_enemy_obstacles() -> Array[Vector2i]:
 	var obstacles: Array[Vector2i] = []
@@ -391,15 +394,28 @@ func _on_cell_clicked(coord: Vector2i) -> void:
 	_start_hero_movement(selected_path)
 
 func _on_right_click() -> void:
+	_go_back()
+
+func _go_back() -> void:
 	if is_moving:
 		return
 	var mouse_pos = get_viewport().get_mouse_position()
-	if item_select_modal.visible:
+	
+	# 1. ヘルプモーダルが開いている場合
+	if help_modal and help_modal.visible:
+		help_modal.visible = false
+		DebugLogger.info("MainGame._go_back", "ヘルプモーダルを閉じました")
+		return
+
+	# 2. アイテム選択モーダルが開いている場合
+	if item_select_modal and item_select_modal.visible:
 		item_select_modal.visible = false
 		_show_action_command_menu(mouse_pos)
+		DebugLogger.info("MainGame._go_back", "アイテムモーダルからコマンドメニューへ復帰")
 		return
+
+	# 3. 移動先選択中（出目確定後）の場合
 	if current_dice_roll > 0:
-		# 移動先選択中ならキャンセルしてメニュー再表示
 		current_dice_roll = 0
 		reachable_cells.clear()
 		board_view.clear_highlights()
@@ -407,13 +423,19 @@ func _on_right_click() -> void:
 		hud.hide_dice_result()
 		hud.log_message("[Cancel] 移動先選択をキャンセルしました。")
 		_show_action_command_menu(mouse_pos)
+		DebugLogger.info("MainGame._go_back", "移動先選択をキャンセルしてコマンドメニューへ復帰")
 		return
 	
-	# 通常時：メニューが開いていれば閉じ、閉じていれば開く
-	if action_command_menu.visible:
+	# 4. コマンドメニューが開いている場合：閉じて盤面確認モードへ
+	if action_command_menu and action_command_menu.visible:
 		action_command_menu.close_menu()
-	else:
-		_show_action_command_menu(mouse_pos)
+		DebugLogger.info("MainGame._go_back", "コマンドメニューを閉じて盤面確認モードへ")
+		return
+		
+	# 5. 盤面確認モード中の場合：マウスポインタ位置にコマンドメニューを再展開
+	_show_action_command_menu(mouse_pos)
+	DebugLogger.info("MainGame._go_back", "盤面確認モードからコマンドメニューを再展開")
+
 
 
 

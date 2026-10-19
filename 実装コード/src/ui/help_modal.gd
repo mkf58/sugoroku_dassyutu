@@ -15,8 +15,14 @@ func _ready() -> void:
 func open() -> void:
     visible = true
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
     if visible and event is InputEventMouseButton and event.pressed:
         if event.button_index == MOUSE_BUTTON_RIGHT:
+            get_viewport().set_input_as_handled()
             visible = false
             emit_signal("closed")
+    elif visible and event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+        get_viewport().set_input_as_handled()
+        visible = false
+        emit_signal("closed")
+

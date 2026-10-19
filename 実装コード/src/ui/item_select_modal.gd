@@ -21,11 +21,17 @@ func _ready() -> void:
 	panel_style.shadow_size = 10
 	$Panel.add_theme_stylebox_override("panel", panel_style)
 
-func _gui_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
+	if not visible:
+		return
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_RIGHT:
-			accept_event()
+			get_viewport().set_input_as_handled()
 			_on_close_pressed()
+	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+		get_viewport().set_input_as_handled()
+		_on_close_pressed()
+
 
 func _on_close_pressed() -> void:
 	visible = false
