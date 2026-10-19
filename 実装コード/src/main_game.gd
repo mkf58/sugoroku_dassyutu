@@ -92,42 +92,82 @@ func _init_poc_stage() -> void:
 
 	var board = GridBoard.new()
 	
-	# PoC用盤面（10x6 のグリッド、直線・分岐・水トラップ・宝箱・ゴール）
-	# (0,2) から (8,2) までのメインストリート
-	for x in range(9):
+	# =========================================================================
+	# 広域回廊型マップ（15x7グリッド、全CellType網羅）
+	# =========================================================================
+	
+	# 1. 中央メインストリート（Y=3, X=1〜14）
+	for x in range(1, 15):
 		var type = Enums.CellType.NORMAL
-		if x == 0:
-			type = Enums.CellType.NORMAL
-		elif x == 3:
-			type = Enums.CellType.WATER_TRAP # 水トラップ
-		elif x == 5:
-			type = Enums.CellType.EVENT      # 宝箱マス
-		elif x == 8:
-			type = Enums.CellType.EXIT       # ゴール
-		board.add_cell(CellData.new(Vector2i(x, 2), type))
-		if x > 0:
-			board.connect_cells(Vector2i(x - 1, 2), Vector2i(x, 2))
-			
-	# 上側への迂回路 (2,1) - (3,1) - (4,1)
-	board.add_cell(CellData.new(Vector2i(2, 1), Enums.CellType.NORMAL))
-	board.add_cell(CellData.new(Vector2i(3, 1), Enums.CellType.ADDITIONAL_MOVE)) # +2マス
-	board.add_cell(CellData.new(Vector2i(4, 1), Enums.CellType.NORMAL))
-	board.connect_cells(Vector2i(2, 2), Vector2i(2, 1))
-	board.connect_cells(Vector2i(2, 1), Vector2i(3, 1))
-	board.connect_cells(Vector2i(3, 1), Vector2i(4, 1))
-	board.connect_cells(Vector2i(4, 1), Vector2i(4, 2))
+		if x == 4:
+			type = Enums.CellType.SKIP_TURN        # 1回休み
+		elif x == 6:
+			type = Enums.CellType.WATER_TRAP       # 水魔術トラップ
+		elif x == 9:
+			type = Enums.CellType.ADDITIONAL_MOVE  # +2マス
+		elif x == 14:
+			type = Enums.CellType.EXIT             # 脱出ゴール
+		board.add_cell(CellData.new(Vector2i(x, 3), type))
+		if x > 1:
+			board.connect_cells(Vector2i(x - 1, 3), Vector2i(x, 3))
 
-	# 主人公と魔女の生成
-	var hero = CharacterData.new("HERO", "主人公", Vector2i(0, 2))
-	var witch = EnemyData.new("WITCH", Enums.EnemyType.TRACKING, Vector2i(6, 2))
+	# 2. 北側回廊（Y=1, X=3〜11）
+	for x in range(3, 12):
+		var type = Enums.CellType.NORMAL
+		if x == 3:
+			type = Enums.CellType.ADDITIONAL_MOVE  # +2マス
+		elif x == 5 or x == 11:
+			type = Enums.CellType.EVENT            # 宝箱マス
+		elif x == 7:
+			type = Enums.CellType.ROLL_AGAIN       # もう1回マス
+		elif x == 9:
+			type = Enums.CellType.WATER_TRAP       # 水魔術トラップ
+		board.add_cell(CellData.new(Vector2i(x, 1), type))
+		if x > 3:
+			board.connect_cells(Vector2i(x - 1, 1), Vector2i(x, 1))
+
+	# 3. 南側回廊（Y=5, X=3〜11）
+	for x in range(3, 12):
+		var type = Enums.CellType.NORMAL
+		if x == 3 or x == 11:
+			type = Enums.CellType.EVENT            # 宝箱マス
+		elif x == 5:
+			type = Enums.CellType.RETURN_TO_START  # 振り出しマス
+		elif x == 7:
+			type = Enums.CellType.ADDITIONAL_MOVE  # +2マス
+		elif x == 9:
+			type = Enums.CellType.ROLL_AGAIN       # もう1回マス
+		board.add_cell(CellData.new(Vector2i(x, 5), type))
+		if x > 3:
+			board.connect_cells(Vector2i(x - 1, 5), Vector2i(x, 5))
+
+	# 4. 縦の連絡通路（X=3, X=7, X=11）
+	for connect_x in [3, 7, 11]:
+		# 北への連絡マス (connect_x, 2)
+		board.add_cell(CellData.new(Vector2i(connect_x, 2), Enums.CellType.NORMAL))
+		board.connect_cells(Vector2i(connect_x, 1), Vector2i(connect_x, 2))
+		board.connect_cells(Vector2i(connect_x, 2), Vector2i(connect_x, 3))
+		# 南への連絡マス (connect_x, 4)
+		board.add_cell(CellData.new(Vector2i(connect_x, 4), Enums.CellType.NORMAL))
+		board.connect_cells(Vector2i(connect_x, 3), Vector2i(connect_x, 4))
+		board.connect_cells(Vector2i(connect_x, 4), Vector2i(connect_x, 5))
+
+	# 主人公と魔女の生成（主人公: (1,3), 魔女: (12,3) で初期距離11マス！）
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(1, 3))
+	var witch = EnemyData.new("WITCH", Enums.EnemyType.TRACKING, Vector2i(12, 3))
 	
 	board_view.setup_board(board, cell_scene)
-	board_view.add_piece(unit_piece_scene, "HERO", "主人公", Vector2i(0, 2), true, false)
-	board_view.add_piece(unit_piece_scene, "WITCH", "魔女", Vector2i(6, 2), false, true)
+	board_view.add_piece(unit_piece_scene, "HERO", "主人公", Vector2i(1, 3), true, false)
+	board_view.add_piece(unit_piece_scene, "WITCH", "魔女", Vector2i(12, 3), false, true)
 	
-	tm.setup_stage(board, [hero], [witch], "POC_STAGE")
+	# カメラ位置を広大マップの中心付近へ合わせる
+	camera.position = Vector2(480, 200)
+	camera.zoom = Vector2(0.95, 0.95)
+	
+	tm.setup_stage(board, [hero], [witch], "WIDE_POC_STAGE")
 	tm.start_player_turn()
 	tm.select_character("HERO")
+
 	
 	current_dice_roll = 0
 	reachable_cells.clear()
@@ -137,8 +177,9 @@ func _init_poc_stage() -> void:
 	hud.update_turn_info(tm.current_turn, "主人公の行動を選択")
 	hud.set_action_buttons_enabled(true)
 	hud.set_action_panel_visible(false) # 新UIへ移行するため旧パネルは非表示
-	hud.log_message("[Stage] PoCステージ初期化完了。主人公: (0,2), 魔女: (6,2)")
+	hud.log_message("[Stage] 広域脱出ステージ初期化完了。主人公: (1,3), 魔女: (12,3)")
 	hud.log_message("[Turn 1] プレイヤーターン開始。行動コマンドを選択してください。")
+
 	
 	# 行動選択メニューを表示
 	call_deferred("_show_action_command_menu")
@@ -538,8 +579,6 @@ func _on_enemy_turn_finished() -> void:
 		
 	# 次のターンへ進行
 	tm.end_turn_and_advance()
-	# 主人公を行動選択状態にする（必須！）
-	tm.select_character("HERO")
 	
 	var hero = tm.characters["HERO"]
 	var hero_piece = board_view.get_piece("HERO")
@@ -550,12 +589,24 @@ func _on_enemy_turn_finished() -> void:
 	reachable_cells.clear()
 	selected_path.clear()
 	is_moving = false
-	
+
+	# 主人公を行動選択状態にする（1回休みの場合は自動スキップ）
+	if not tm.select_character("HERO"):
+		if hero.has_acted or hero.is_skipped:
+			action_command_menu.visible = false
+			hud.update_turn_info(tm.current_turn, "主人公は1回休み中...")
+			hud.log_message("[Turn %d] 主人公は1回休みのため行動をスキップし、魔女のターンへ進みます。" % tm.current_turn)
+			get_tree().create_timer(1.2).timeout.connect(func():
+				_advance_to_enemy_turn()
+			)
+			return
+
 	hud.update_turn_info(tm.current_turn, "主人公の行動を選択 [右クリック: 盤面確認]")
 	hud.set_action_buttons_enabled(true)
 	hud.set_action_panel_visible(false)
 	hud.log_message("[Turn %d] プレイヤーターン開始！主人公: %s, 魔女: %s" % [tm.current_turn, str(hero.current_coord), str(tm.enemies["WITCH"].current_coord)])
 	_show_action_command_menu()
+
 
 func _on_retry() -> void:
 	game_over_screen.visible = false
