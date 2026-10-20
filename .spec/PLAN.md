@@ -2109,3 +2109,34 @@ CIでGodot 4を動かすには主に2つのアプローチがあります：
 3. `main` から `dev` ブランチを今作成してリモートにプッシュしてよろしいでしょうか？
 
 **A74. [User]** 
+進行に合意。
+
+---
+
+### Q75. [User & Agent] テスト失敗時にマージを禁止・ブロックする仕組み（ブランチ保護ルール / Required Status Checks）
+#### 1. ユーザーからの質問
+「テスト失敗時にマージはできないようにするとかも可能なんですか？」
+
+#### 2. 回答と仕組み（実務における最重要機能）
+**可能です！実務の開発現場ではほぼ100%この仕組みが導入されています。**
+GitHubの **「Branch Protection Rules（ブランチ保護ルール）」** という機能を使用します。
+
+- **仕組み：**
+  1. `pull_request` トリガーによって、PR作成時にGitHub Actionsの自動テストが走る。
+  2. GitHubリポジトリ設定で「特定のブランチ（`main` や `dev`）は、テストがPass（緑チェック）しないとマージ不可」というガードルールをかける。
+  3. テストが1件でもFail（終了コード1）すると、GitHub上の「Merge pull request」ボタンが赤色またはグレーアウトになり、**物理的にマージが押せなくなる**。
+
+- **設定箇所（GitHub WebUI）：**
+  - リポジトリの `Settings` → `Branches` → `Add branch protection rule`（または `Rules` → `Rulesets`）
+  - 対象ブランチ：`dev` や `main`
+  - チェック項目：
+    - `Require a pull request before merging`（直接pushを禁止し、PRを必須化）
+    - `Require status checks to pass before merging`（ステータスチェックの成功を必須化）
+      → ここで今回作成したジョブ名 `Run Unit Tests` を検索・指定する。
+
+- **今回のプロジェクトでの適用について：**
+  - この機能を使うには、**「マージ前（Pull Request時）にActionsを動かす（`on: pull_request`）」** が必須条件となります。
+  - 次案件の実務では間違いなくこの運用になるため、仕組みと設定方法を把握しておくことが極めて重要です。
+
+**A75. [User]** 
+今回はPR運用は行わないためブランチ保護ルールは適用せず、当初の予定通り「devブランチへのマージ（push）時」の自動テスト実行で進める。
