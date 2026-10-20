@@ -1,5 +1,11 @@
 extends SceneTree
 
+const TestGridBoard = preload("res://tests/test_grid_board.gd")
+const TestStepMovement = preload("res://tests/test_step_movement.gd")
+const TestEnemyAI = preload("res://tests/test_enemy_ai.gd")
+const TestMagicSystem = preload("res://tests/test_magic_system.gd")
+const TestTurnLifecycle = preload("res://tests/test_turn_lifecycle.gd")
+
 func _init() -> void:
     print("========================================")
     print("  RUNNING ALL UNIT TESTS (GDScript 4)   ")

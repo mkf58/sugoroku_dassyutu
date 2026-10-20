@@ -23,7 +23,10 @@ jobs:
           version: 4.3.0
           use-dotnet: false
 
-      # 3. ヘッドレスモードで単体テストスクリプトを実行
+      # 3. プロジェクト初期化（クラスキャッシュ目録生成）と単体テスト実行
       - name: Run Godot Unit Tests
         run: |
+          # クリーン環境で class_name をスキャン・認識させるためエディタ初期化を実行
+          godot --headless --path 実装コード --editor --quit || true
+          # 単体テストスイートの実行
           godot --headless --path 実装コード -s tests/test_runner.gd
