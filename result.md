@@ -11,21 +11,18 @@
    - [.github/workflows/ci.yml](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.github/workflows/ci.yml) を作成。
    - `actions/checkout@v4` によるコードチェックアウト。
    - `chickensoft-games/setup-godot@v2` によるGodot 4（4.3.0）実行バイナリの自動セットアップ。
-   - ヘッドレスモード（`godot --headless --path 実装コード -s tests/test_runner.gd`）による単体テスト一括実行および合否終了コード判定。
-3. **ブランチ運用の整備：**
-   - 本番（リリース用）の `main` に対し、開発統合用として `dev` ブランチを新規作成・リモートへプッシュ。
-   - 作業ブランチ `feature/github-actions-ci` にてワークフローファイルをコミットし、リモートへプッシュ完了。
+3. **CI環境固有のクラスキャッシュ初期化とpreload対応（トラブルシューティング）：**
+   - 初回実行時に発生した `Identifier not declared in the current scope`（クリーン環境でclass_nameが未スキャン・未登録だった問題）を解決。
+   - ワークフローに `godot --headless --path 実装コード --editor --quit || true` を追加してクラスインデックスを初期化。
+   - `test_runner.gd` の先頭に各テストクラスの `preload` 定数を追加し、依存関係を直接解決。
+4. **マージおよび自動テストの再実行：**
+   - 修正内容を `feature/github-actions-ci` にコミット・プッシュ後、開発統合ブランチ `dev` にマージしてリモートへプッシュ完了。
 
 ## プッシュしたブランチ名
 - **作業ブランチ：** `feature/github-actions-ci`
 - **開発統合ブランチ：** `dev`
 
 ## 次に行うべき提案（ユーザー様へのメッセージ）
-Step 4（動作検証とログの読み解き）に進むため、以下のいずれかの方法でActionsを実際に動かしてみましょう：
-
-1. **推奨（実務通りのフロー検証）：**
-   - `feature/github-actions-ci` の内容を `dev` ブランチにマージしてプッシュします。
-   - マージされると同時に `push: branches: [dev]` がトリガーされ、GitHubの「Actions」タブで自動テストが自動発火します。
-2. **ログの確認ポイント：**
-   - リポジトリの「Actions」タブを開き、緑色のチェック（Pass）または赤色の×（Fail）が表示されるか確認します。
-   - ジョブ内の「Run Godot Unit Tests」ステップを開いて、コンソールログにテスト結果（TOTAL PASSED / FAILED）が出力されているか読み解いてみましょう。
+GitHubリポジトリの **「Actions」** タブを開き、新しく発火したワークフローの実行状況をご確認ください：
+- 黄色い回転アイコン（実行中）から、**緑色のチェックマーク（Pass）** に変わることを確認してください。
+- ジョブをクリックし、「Run Godot Unit Tests」ステップの展開ログに `TOTAL PASSED: 5 / TOTAL FAILED: 0` が出力されていれば、CIと自動テスト環境の構築は完全成功です！

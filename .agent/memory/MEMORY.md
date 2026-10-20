@@ -34,6 +34,10 @@
    - **Godot 4のイベント伝播・吸収対策：** モーダル画面（ItemSelectModal等）で右クリック/Escを検知する際は、背景ColorRectやPanelの `MOUSE_FILTER_STOP` によるイベント吸収を回避するため、ルートノードの `_input(event)` で拾って `get_viewport().set_input_as_handled()` する。
    - UI操作は**『左クリック＝すべて確定・選択』『右クリック＝すべてキャンセル・閉じる』**を徹底厳守する。
    - 画面クリックスキップによるTween省略、画面内ログパネル（DebugLogger）および「📋 ログコピー」ボタンによる即時デバッグ環境を担保する。
-6. **ドキュメント管理ルール：**
+6. **CI/CDとGitHub Actionsの運用原則：**
+   - **無料枠節約設計：** ランナーOSはLinux（`ubuntu-latest`：消費倍率1倍）一択。ブランチへのpushトリガーは統合ブランチ（`dev` / `main`）に限定し、作業中ブランチへのpushでは動かさない。手動検証用に `workflow_dispatch` を配置する。
+   - **Godot 4のヘッドレスCI特有の罠（クラスキャッシュ）：** クリーン環境では `.godot/global_script_class_cache.cfg` が未生成のため `class_name` が未認識となる。テスト前に `godot --headless --path <dir> --editor --quit || true` でプロジェクトを初期化し、テストランナー側でも `preload` を併用することで確実に解決する。
+   - **ブランチ保護ルール（Required Status Checks）：** PR運用を行う実務現場では、PR作成トリガー（`pull_request`）とブランチ保護ルールを組み合わせることで、「テスト失敗時はマージボタンを物理的にブロック」する品質ゲートウェイを構築できる。
+7. **ドキュメント管理ルール：**
    - 基本設計書は、実装後の結合テスト仕様書へそのまま転用できるよう、表形式の結合テスト観点（IT-UI, IT-TRN, IT-DAT）を必ず含めて記述する。
    - QAのログは必ず `.spec/PLAN.md` に残し、決定事項を速やかに要件定義書および基本設計書に反映する。
