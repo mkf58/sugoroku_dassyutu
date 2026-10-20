@@ -1,0 +1,29 @@
+name: CI & Automated Tests
+
+# 実行トリガー：devまたはmainへのpush、および手動実行
+on:
+  push:
+    branches: [ dev, main ]
+  workflow_dispatch:
+
+jobs:
+  unit-test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. リポジトリのソースコードを取得
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      # 2. Godot 4 (4.3.0) の実行バイナリをセットアップ
+      - name: Setup Godot 4
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.3.0
+          use-dotnet: false
+
+      # 3. ヘッドレスモードで単体テストスクリプトを実行
+      - name: Run Godot Unit Tests
+        run: |
+          godot --headless --path 実装コード -s tests/test_runner.gd
