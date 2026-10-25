@@ -40,3 +40,5 @@
 7. **CI/CDとGitHub Actionsの運用原則：**
    - **無料枠節約設計：** ランナーOSはLinux（`ubuntu-latest`：消費倍率1倍）一択。ブランチへのpushトリガーは統合ブランチ（`dev` / `main`）に限定し、作業中ブランチへのpushでは動かさない。手動検証用に `workflow_dispatch` を配置する。
    - **Godot 4のヘッドレスCI特有の罠（クラスキャッシュ）：** クリーン環境では `.godot/global_script_class_cache.cfg` が未生成のため `class_name` が未認識となる。テスト前に `godot --headless --path <dir> --editor --quit || true` でプロジェクトを初期化し、テストランナー側でも `preload` を併用することで確実に解決する。
+   - **GDScript 4のmatch構文と外部Enum定数の罠：** `match variable:` 内で別クラスのEnum定数（`Enums.CellType.*` 等のドット連結定数）をパターンに指定すると、定数として認識されず期待通りにマッチしない。外部Enumの比較には `if / elif` 構文を徹底すること。
+

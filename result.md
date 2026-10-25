@@ -13,7 +13,12 @@
      - **UT-MAGIC（[test_magic_system.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_magic_system.gd)）：** 10ケース（炎撃破、水トラップ生成、祈る潜行維持、行動時潜行解除、死亡時拒否、行動済み拒否、詠唱者不在防御、対象不在、炎射程境界、土魔法分岐デシジョン）
      - **UT-TURN（[test_turn_lifecycle.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_turn_lifecycle.gd)）：** 8ケース（ターン進行、少女3T復活、魔女2T復活、死亡選択拒否、行動済み選択拒否、休み選択拒否、未登録選択拒否、復活境界値）
      - **UT-ITEM（[test_inventory_items.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_inventory_items.gd)）：** 4ケース（固定賽モデル、インベントリ追加・消費、出目境界値1/6、空インベントリ推移）
-3. **PLAN.md & TODO.md の同期：**
+3. **CI初回実行時の不具合検知と即時修正：**
+   - **UT-BOARD（未実装メソッドの実装）：**
+     - `GridBoard` に `find_farthest_linear_cell`（最遠走査）および `has_clear_line_of_sight`（直線視界判定）を実装。
+   - **UT-STEP（GDScript match構文の外部Enum互換性是正）：**
+     - `TurnManager.resolve_stop_cell` の `match` 構文において、GDScriptの外部Enum（`Enums.CellType.*`）が定数パターンとしてマッチしなかった問題を、`if / elif` 構文に是正。これにより特殊停止マス（追加移動・再ロール・イベント・クリア）の全シグナルが正常に発火することを確認。
+4. **PLAN.md & TODO.md の同期：**
    - [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md) の「2. 深堀り・QA」に A79回答および Q80 を記録。
    - [.spec/TODO.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/TODO.md) に仕様書マトリクス化およびテスト同期の完了を反映。
 
