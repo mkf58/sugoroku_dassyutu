@@ -69,19 +69,19 @@ func test_special_stop_cells_resolution() -> void:
 	var cell_add = CellData.new(Vector2i(1, 0), Enums.CellType.ADDITIONAL_MOVE)
 	cell_add.event_params = {"steps": 2}
 	hero.has_acted = true
-	var granted_steps = 0
-	tm.additional_move_granted.connect(func(u_id, s): granted_steps = s)
+	var granted_steps = [0]
+	tm.additional_move_granted.connect(func(u_id, s): granted_steps[0] = s)
 	tm.resolve_stop_cell(hero, cell_add)
-	assert_eq(granted_steps, 2, "UT-STEP-N04: 追加移動2歩付与")
+	assert_eq(granted_steps[0], 2, "UT-STEP-N04: 追加移動2歩付与")
 	assert_false(hero.has_acted, "UT-STEP-N04: 追加移動で行動可能復帰")
 	
 	# 2. ROLL_AGAIN
 	var cell_roll = CellData.new(Vector2i(2, 0), Enums.CellType.ROLL_AGAIN)
 	hero.has_acted = true
-	var roll_again_called = false
-	tm.roll_again_granted.connect(func(u_id): roll_again_called = true)
+	var roll_again_called = [false]
+	tm.roll_again_granted.connect(func(u_id): roll_again_called[0] = true)
 	tm.resolve_stop_cell(hero, cell_roll)
-	assert_true(roll_again_called, "UT-STEP-N04: 再ロールシグナル発火")
+	assert_true(roll_again_called[0], "UT-STEP-N04: 再ロールシグナル発火")
 	assert_false(hero.has_acted, "UT-STEP-N04: 再ロールで行動可能復帰")
 	
 	# 3. RETURN_TO_START
@@ -106,19 +106,20 @@ func test_event_and_exit_cells_resolution() -> void:
 	# 1. EVENTマス
 	var cell_event = CellData.new(Vector2i(1, 0), Enums.CellType.EVENT)
 	cell_event.event_id = "CHEST_TEST"
-	var event_triggered = false
-	tm.cell_event_triggered.connect(func(cell): event_triggered = true)
+	var event_triggered = [false]
+	tm.cell_event_triggered.connect(func(cell): event_triggered[0] = true)
 	tm.resolve_stop_cell(hero, cell_event)
-	assert_true(event_triggered, "UT-STEP-N05: イベント発火")
+	assert_true(event_triggered[0], "UT-STEP-N05: イベント発火")
 	assert_true(cell_event.is_consumed, "UT-STEP-N05: イベント消費済み更新")
 	
 	# 2. EXITマス
 	var cell_exit = CellData.new(Vector2i(2, 0), Enums.CellType.EXIT)
-	var stage_cleared = false
-	tm.stage_cleared.connect(func(s_id): stage_cleared = true)
+	var stage_cleared = [false]
+	tm.stage_cleared.connect(func(s_id): stage_cleared[0] = true)
 	tm.resolve_stop_cell(hero, cell_exit)
-	assert_true(stage_cleared, "UT-STEP-N05: クリアシグナル発火")
+	assert_true(stage_cleared[0], "UT-STEP-N05: クリアシグナル発火")
 	assert_eq(tm.current_phase, Enums.TurnPhase.STAGE_CLEAR, "UT-STEP-N05: STAGE_CLEAR遷移")
+
 
 ## UT-STEP-E01: nullユニット移動の防御
 func test_step_unit_null_guard() -> void:
