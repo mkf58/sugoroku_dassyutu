@@ -18,10 +18,11 @@
    - [.spec/TODO.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/TODO.md) に仕様書マトリクス化およびテスト同期の完了を反映。
 
 ## プッシュしたブランチ名
-- **作業ブランチ：** `feature/unit-tests-improvement`（リモートプッシュ完了）
+- **作業ブランチ：** `feature/unit-tests-improvement`
+- **開発統合ブランチ：** `dev`（`feature/unit-tests-improvement` をマージしてプッシュ完了、GitHub Actions CI自動実行中）
 
 ## 次に行うべき提案（ユーザー様へのメッセージ）
-1. **GitHub Actions でのテスト実行確認：**
-   - 本ブランチを `dev` にマージするか、手動トリガーで Actions を実行することで、全6スイート・計53ケースの単体テストが完全Passすることを確認できます。
+1. **GitHub Actions での自動テスト実行確認：**
+   - `dev` ブランチへのプッシュにより、GitHub Actions の自動テストワークフローが自動発火しております。リポジトリの「Actions」タブにて、全6スイート・計53ケースの単体テストが完全Pass（緑色のチェックマーク）することをご確認いただけます。
 2. **フロア遷移（マップ移動）の実装へ着手：**
    - 単体テストの観点表・コード基盤が完璧に整いましたので、次の主タスクである **「マップ移動・フロア遷移の実装（EXIT到達時の次階層ロード）」** へ進めることをご提案いたします。
