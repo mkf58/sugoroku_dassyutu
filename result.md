@@ -1,28 +1,41 @@
-# 作業結果サマリー (2026-10-20)
+# 作業結果サマリー (2026-10-25)
 
 ## 実行した内容のサマリー
-次案件に向けたCI/CD実務の学習・経験蓄積のため、GitHub Actionsを用いた自動テスト（CI）環境の構築をユーザー主導（エージェント伴走リード）にて実施いたしました。
+ユーザー様からのご要望「どちらかというとUTを改善したい」に基づき、初期PoC実装後に拡充された重要仕様・新機能（理不尽死防止、特殊停止マス、魔女水トラップ即停止、アイテムデータ等）に対する単体テスト（UT）スイートの大幅な改善・拡充を実施いたしました。
 
-1. **無料枠を意識した省エネ設計とトリガーの策定：**
-   - **実行環境：** Linux（`ubuntu-latest`）を採用（Windows/macOSに比べ無料枠の消費レートが最も低コスト）。
-   - **トリガー条件：** `dev` および `main` への `push`（マージ時を含む）に限定。日々の作業中ブランチへのpushでは動かさず、無駄な実行枠消費を徹底防止。
-   - **手動実行トリガー：** `workflow_dispatch` を追加し、GitHub Web画面からいつでも単発で手動テスト実行可能な体制を確保。
-2. **ワークフロー定義ファイルの作成：**
-   - [.github/workflows/ci.yml](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.github/workflows/ci.yml) を作成。
-   - `actions/checkout@v4` によるコードチェックアウト。
-   - `chickensoft-games/setup-godot@v2` によるGodot 4（4.3.0）実行バイナリの自動セットアップ。
-3. **CI環境固有のクラスキャッシュ初期化とpreload対応（トラブルシューティング）：**
-   - 初回実行時に発生した `Identifier not declared in the current scope`（クリーン環境でclass_nameが未スキャン・未登録だった問題）を解決。
-   - ワークフローに `godot --headless --path 実装コード --editor --quit || true` を追加してクラスインデックスを初期化。
-   - `test_runner.gd` の先頭に各テストクラスの `preload` 定数を追加し、依存関係を直接解決。
-4. **マージおよび自動テストの再実行：**
-   - 修正内容を `feature/github-actions-ci` にコミット・プッシュ後、開発統合ブランチ `dev` にマージしてリモートへプッシュ完了。
+1. **単体テスト詳細設計書の改定・同期：**
+   - [詳細設計/単体テスト仕様書_UT.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/単体テスト仕様書_UT.md) を全面的に更新。各スイートの追加テストケース（Given / When / Then）を詳細に定義。
+2. **既存テストスイートの改善・拡充：**
+   - **UT-BOARD（[test_grid_board.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_grid_board.gd)）：**
+     - 【UT-BOARD-05】障害物（未潜行魔女）マスを考慮した到達可能マス除外・理不尽死防止ロジックの単体テスト
+     - 【UT-BOARD-06】障害物マスを回避する迂回経路探索の単体テスト
+     - 【UT-BOARD-07】直線走査による最遠マス特定（`find_farthest_linear_cell`）の単体テスト
+   - **UT-STEP（[test_step_movement.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_step_movement.gd)）：**
+     - 【UT-STEP-04】少女が魔女と同マス接触した際の殺害判定（`GIRL_DIED`）と3ターン復活設定の単体テスト
+     - 【UT-STEP-05】特殊停止マス（`ADDITIONAL_MOVE` / `ROLL_AGAIN` / `RETURN_TO_START` / `SKIP_TURN`）の効果適用単体テスト
+     - 【UT-STEP-06】`EVENT` マス（消費フラグ・イベント発火）および `EXIT` マス（クリア発火）の単体テスト
+   - **UT-ENEMY（[test_enemy_ai.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_enemy_ai.gd)）：**
+     - 【UT-ENEMY-04】魔女が移動中に水トラップマスへ侵入した際の即時停止・残歩数破棄の単体テスト
+     - 【UT-ENEMY-05】スタン状態（`stun_turns > 0`）の魔女の行動スキップ単体テスト
+   - **UT-MAGIC（[test_magic_system.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_magic_system.gd)）：**
+     - 【UT-MAGIC-03】土魔法による地中潜行（自身）および魔女スタン（敵対象）の単体テスト
+     - 【UT-MAGIC-04】魔法詠唱制約チェック（死亡中・既に行動済みのユニットによる詠唱拒否）の単体テスト
+     - 【UT-MAGIC-05】土潜行中の「待機・祈る」による潜行維持の単体テスト
+3. **新規テストスイートの新設：**
+   - **UT-ITEM（[test_inventory_items.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_inventory_items.gd)）：**
+     - 【UT-ITEM-01】固定出目ダイス（「1の賽」〜「6の賽」）のモデルデータ整合性の単体テスト
+     - 【UT-ITEM-02】インベントリへのアイテム追加・指定アイテム消費処理の単体テスト
+4. **テストランナーの更新：**
+   - [test_runner.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_runner.gd) に `TestInventoryItems` を追加登録し、全6スイートが一括実行・集計される構成に更新。
+5. **PLAN & TODO の同期：**
+   - [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md) に Q78回答および Q79（UT改善・拡充方針）を記録。
+   - [.spec/TODO.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/TODO.md) にUT改善の完了を反映。
 
 ## プッシュしたブランチ名
-- **作業ブランチ：** `feature/github-actions-ci`
-- **開発統合ブランチ：** `dev`
+- **作業ブランチ：** `feature/unit-tests-improvement`（リモートプッシュ完了）
 
 ## 次に行うべき提案（ユーザー様へのメッセージ）
-GitHubリポジトリの **「Actions」** タブを開き、新しく発火したワークフローの実行状況をご確認ください：
-- 黄色い回転アイコン（実行中）から、**緑色のチェックマーク（Pass）** に変わることを確認してください。
-- ジョブをクリックし、「Run Godot Unit Tests」ステップの展開ログに `TOTAL PASSED: 5 / TOTAL FAILED: 0` が出力されていれば、CIと自動テスト環境の構築は完全成功です！
+1. **GitHub Actions での手動実行検証（推奨）：**
+   - GitHubリポジトリの **「Actions」** タブより、手動トリガー（`workflow_dispatch`）または本作業ブランチを `dev` にマージして、全6スイートの単体テストがすべてPass（緑チェック）することをご確認いただけます。
+2. **次期タスクへの移行：**
+   - 単体テストの基盤が強固に整いましたので、続いて本日の主要タスクである **「マップ移動・フロア遷移の実装（EXIT到達時の次階層ロード）」**、または **「結合テストの拡充・実施」** へ進めることをご提案いたします。
