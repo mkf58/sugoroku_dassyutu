@@ -1,36 +1,37 @@
 # HANDOFF
 
 ## 作業日時
-2026-10-20 20:53
+2026-10-25 21:35
 
 ## 現在のステータス
-- **フェーズ：** GitHub ActionsによるCI/自動テスト環境の構築および検証完了
-- **作業ブランチ：** `feature/github-actions-ci`（`dev` にマージ・プッシュ済み）
-- **最新コミット：** `609a9c3`（リモートプッシュ完了）
+- **フェーズ：** 単体テスト（UT）仕様書の体系的マトリクス化および全テストコード完全同期完了
+- **作業ブランチ：** `feature/unit-tests-improvement`（リモートプッシュ完了）
+- **最新コミット：** `3731b3c`（リモートプッシュ完了）
 
 ## 本日の実施内容サマリー
-1. **GitHub Actions による CI/自動テスト環境の構築：**
-   - [.github/workflows/ci.yml](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.github/workflows/ci.yml) を新規作成。
-   - 無料枠節約設計：Linux（`ubuntu-latest`：消費倍率1倍）を採用。日々のpushでは動かさず、統合ブランチ（`dev` / `main`）へのpush時のみ自動実行。手動実行ボタン（`workflow_dispatch`）も配備。
-2. **実務レベルのトラブルシューティング（Godot 4 CI環境特有の罠の解決）：**
-   - 初回テスト時に発生した `Identifier not declared in the current scope`（クリーン環境でclass_nameが未スキャン・未登録だった問題）を解決。
-   - ワークフローに `godot --headless --path 実装コード --editor --quit || true` を追加してクラスインデックスを初期化。
-   - [test_runner.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_runner.gd) の先頭に各テストクラスの `preload` 定数を追加し、依存関係を確実に解決。
-   - GitHub Actions上で単体テスト（UT）が100% Pass（緑色のチェックマーク）することを確認。
-3. **CI/CD設計・実務プラクティスの学習とQA整理（PLAN.md）：**
-   - ブランチ保護ルール（Required Status Checks）によるマージブロック機構の仕組みと設定方法を整理。
-   - `if: github.event_name == 'pull_request'` による処理分岐、およびYAMLファイル分割によるUT/ITの実行切り替えベストプラクティスを整理。
-4. **ブランチ構成の整備：**
-   - 本番（リリース用）の `main` に対し、開発統合用として `dev` ブランチを新設し、リモートプッシュ完了。
+1. **`spec-to-test` スキルに基づく単体テスト観点の見直しと仕様書マトリクス化：**
+   - 仕様書ベース・テスト生成スキルに基づき、[詳細設計/単体テスト仕様書_UT.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/単体テスト仕様書_UT.md) を全面的に更新・恒久化。
+   - **4大観点マトリクス（正常系N・準正常系E・境界値B・デシジョンテーブルD）** により、全6スイート・計53テストケースの入出力条件・期待結果を網羅的に定義。
+   - リアルタイム接触判定、魔女追跡ターゲット優先順位、土魔法効果分岐、障害物迂回経路探索をデシジョンテーブルとして明文化。
+2. **仕様書とテストコードの完全1対1同期（全6スイート）：**
+   - **UT-BOARD（[test_grid_board.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_grid_board.gd)）：** 全11ケース（最短経路、折り返し、最遠走査、視界、未接続防御、目的地障害物、不正経路、出目1、偶奇折り返し、障害物封鎖、迂回デシジョン）
+   - **UT-STEP（[test_step_movement.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_step_movement.gd)）：** 全11ケース（歩行継続、通常到着、水トラップ停止、特殊停止マス効果、イベント/クリア、nullユニット防御、null盤面防御、消費済み再発火防止、初手接触、最終歩水トラップ、リアルタイム接触デシジョン）
+   - **UT-ENEMY（[test_enemy_ai.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_enemy_ai.gd)）：** 全9ケース（最短距離、同距離主人公、全員潜行時初期位置、魔女水トラップ即停止、スタン中スキップ、生存味方不在防御、距離0、スタン減算、ターゲット選定デシジョン）
+   - **UT-MAGIC（[test_magic_system.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_magic_system.gd)）：** 全10ケース（炎撃破、水トラップ生成、祈る潜行維持、行動時潜行解除、死亡時拒否、行動済み拒否、詠唱者不在防御、対象不在、炎射程境界、土魔法分岐デシジョン）
+   - **UT-TURN（[test_turn_lifecycle.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_turn_lifecycle.gd)）：** 全8ケース（ターン進行、少女3T復活、魔女2T復活、死亡選択拒否、行動済み選択拒否、休み選択拒否、未登録選択拒否、復活境界値）
+   - **UT-ITEM（[test_inventory_items.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_inventory_items.gd)）：** 全4ケース（固定賽モデル、インベントリ追加・消費、出目境界値1/6、空インベントリ推移）
+3. **テストランナーの更新：**
+   - [test_runner.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_runner.gd) に `TestInventoryItems` を追加登録し、全6スイートが一括実行・集計される構成に更新。
+4. **PLAN, TODO, result の同期：**
+   - [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md) の「2. 深堀り・QA」に Q78〜Q80 を完全記録。
+   - [.spec/TODO.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/TODO.md) にUT改善・仕様書マトリクス化の完了を反映。
+   - [result.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/result.md) を最新のサマリーで更新。
 
 ## 次回の作業（引き継ぎ事項）
 次回セッションは以下のタスクから着手する：
 1. **マップ移動・フロア遷移の実装（優先度：高）：**
-   - `EXIT` 到達時にクリア画面だけでなく、次階層（チュートリアル階 → キッチン・食堂など）のステージデータをロードして階層遷移するフレームワークの構築。
-2. **結合テスト仕様書およびテストコードの作成・実施（優先度：高）：**
-   - 基本設計書（IT-UI, IT-TRN, IT-DAT観点）をもとに、`結合テスト仕様書_および_コード/` フォルダ配下にテスト仕様書および自動/半自動テスト環境を整備。
-   - 今回構築したCIに結合テスト（IT）の実行ステップを追加検証。
-3. **ユーザー様による広域回廊型マップ・新UIのプレイフィードバック確認：**
-   - 魔女との距離感、迂回路を活用した立ち回り、宝箱・アイテム使用、全マスギミックの発動感の確認。
-4. **本番用全ステージデータ・アセット連携の準備：**
-   - 外部JSON/リソースによるマップデータ定義の分離、アセット差し替え基盤の整備。
+   - `EXIT` 到達時に次階層（チュートリアル階 → 各属性の少女が待つ階層など）のステージデータをロードして階層遷移するフレームワークの構築。
+2. **結合テストの実施・CI統合（優先度：高）：**
+   - 作成済みの結合テスト仕様書（[結合テスト仕様書.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/結合テスト仕様書_および_コード/結合テスト仕様書.md)）およびテストコードの検証、GitHub Actions CIへの統合。
+3. **広域回廊型マップ・新UI（コマンドメニュー・アイテム使用）のプレイフィードバック確認：**
+   - 魔女との駆け引き、迂回路の活用感、固定ダイスアイテムの使用感等の実機確認と細部調整。
