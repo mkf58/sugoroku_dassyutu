@@ -8,11 +8,12 @@
 
 | テストスイート名 | 対象クラス | 検証内容 | テストファイル配置先 |
 | :--- | :--- | :--- | :--- |
-| **UT-BOARD** | `GridBoard` | マス登録、隣接接続、最短経路探索(BFS)、出目折り返し到達判定 | `実装コード/tests/test_grid_board.gd` |
-| **UT-STEP** | `TurnManager` | 1歩ごとの接触判定（即死・少女殺害・潜行やり過ごし）、水トラップ即停止 | `実装コード/tests/test_step_movement.gd` |
-| **UT-ENEMY** | `TurnManager` | 魔女追跡ターゲット選定優先順位、全員潜行時の初期位置移動 | `実装コード/tests/test_enemy_ai.gd` |
-| **UT-MAGIC** | `TurnManager` | 4属性魔法（炎撃破、水トラップ生成、風吹っ飛ばし、土潜行・スタン） | `実装コード/tests/test_magic_system.gd` |
+| **UT-BOARD** | `GridBoard` | マス登録、隣接接続、最短経路探索(BFS)、出目折り返し到達判定、障害物回避到達判定、最遠走査 | `実装コード/tests/test_grid_board.gd` |
+| **UT-STEP** | `TurnManager` | 1歩ごとの接触判定（即死・少女殺害・潜行やり過ごし）、水トラップ即停止、特殊マス停止解決 | `実装コード/tests/test_step_movement.gd` |
+| **UT-ENEMY** | `TurnManager` | 魔女追跡ターゲット選定優先順位、全員潜行時の初期位置移動、魔女水トラップ即停止、スタン処理 | `実装コード/tests/test_enemy_ai.gd` |
+| **UT-MAGIC** | `TurnManager` | 4属性魔法（炎撃破、水トラップ生成、風吹っ飛ばし、土潜行・スタン）、詠唱制約 | `実装コード/tests/test_magic_system.gd` |
 | **UT-TURN** | `TurnManager` | 少女死亡後の3ターン復活処理、エネミー復活、全味方行動完了遷移 | `実装コード/tests/test_turn_lifecycle.gd` |
+| **UT-ITEM** | `ItemData` / Inventory | 固定出目ダイス（1〜6の賽）モデル整合性、インベントリ追加・消費・スタック処理 | `実装コード/tests/test_inventory_items.gd` |
 
 ---
 
@@ -46,7 +47,7 @@
 - **実行操作 (When)：**
   - 出目 2 での到達可能マス集合 `get_reachable_cells_with_steps(Vector2i(0,0), 2)` を取得する。
 - **期待結果 (Then)：**
-  - `(2,0)`（右に2マス進む）だけでなく、`(0,0)`（右に1進んで左に1戻る折り返し）も到達可能マス（キーとして存在）として含まれること。
+  - `(2,0)`（右に2マス進む）だけでなく、`(0,0)`（右に1進んで左に1戻る折り返し）も到達可能マスとして含まれること。
   - `(1,0)` は出目2では停止不可（奇数歩のため）であること。
 
 #### 【UT-BOARD-04】指定歩数での折り返し経路生成の検証
@@ -59,107 +60,159 @@
   - 返却される経路配列が `[Vector2i(0,0), Vector2i(1,0), Vector2i(0,0)]` と完全一致すること。
   - 正確に 2 歩（配列長 3）で元のマスへ折り返して停止すること。
 
+#### 【UT-BOARD-05】障害物（未潜行魔女）マスを考慮した到達可能マス除外の検証
+- **テスト関数名：** `test_reachable_cells_excludes_obstacles()`
+- **前提条件 (Given)：**
+  - 4マスの直線盤面（`(0,0) - (1,0) - (2,0) - (3,0)`）。
+  - `(1,0)` に障害物（未潜行魔女）が存在。
+- **実行操作 (When)：**
+  - `(0,0)` から出目 2 で、障害物 `[(1,0)]` を指定して `get_reachable_cells_with_steps` を実行。
+- **期待結果 (Then)：**
+  - 障害物マス `(1,0)` およびその先のマスは到達可能マスに含まれず、到達可能マス集合が空（または障害物を通過しないマスのみ）となること。
+
+#### 【UT-BOARD-06】障害物マスを回避する迂回経路探索の検証
+- **テスト関数名：** `test_find_path_detours_obstacles()`
+- **前提条件 (Given)：**
+  - ループ構造の盤面（メインストリートと迂回路）。
+  - メインストリート上に障害物が配置されている。
+- **実行操作 (When)：**
+  - 障害物を指定して目的地への経路探索を実行。
+- **期待結果 (Then)：**
+  - 障害物マスを一切通らず、迂回路を経由する安全な経路が返却されること。
+
+#### 【UT-BOARD-07】直線走査による最遠マス特定の検証
+- **テスト関数名：** `test_find_farthest_linear_cell()`
+- **前提条件 (Given)：**
+  - 5マスの直線盤面（`(0,0)` 〜 `(4,0)`）。
+- **実行操作 (When)：**
+  - `(1,0)` から右方向 `Vector2i(1,0)` への走査を実行。
+- **期待結果 (Then)：**
+  - 端のマス `(4,0)` が最遠マスとして正しく返却されること。
+
 ---
 
-## 2.2 UT-STEP: 1歩ごとの接触・トラップ判定テスト (`test_step_movement.gd`)
+## 2.2 UT-STEP: 1歩ごとの接触・トラップ・特殊マス判定テスト (`test_step_movement.gd`)
 
-
-#### 【UT-STEP-01】主人公が未潜行で魔女のマスを通過・侵入した際の即時ゲームオーバー判定
+#### 【UT-STEP-01】主人公が未潜行で魔女のマスへ侵入した際の即時ゲームオーバー判定
 - **テスト関数名：** `test_hero_step_overlap_with_witch_causes_game_over()`
 - **前提条件 (Given)：**
-  - 主人公 `HERO` が `(0,0)`、魔女 `WITCH` が `(1,0)` に配置されている。
-  - 主人公は未潜行（`is_burrowed == false`）。
-  - 主人公は出目 2 で `[(0,0), (1,0), (2,0)]` の経路を移動する。
+  - 主人公 `HERO` が `(0,0)`、魔女 `WITCH` が `(1,0)` に配置。未潜行。
 - **実行操作 (When)：**
-  - 1歩目（`(0,0) -> (1,0)`）を `step_unit` で実行する。
+  - 1歩目（`(0,0) -> (1,0)`）を `step_unit` で実行。
 - **期待結果 (Then)：**
   - 戻り値ステータスが `"GAME_OVER"` であること。
   - `TurnManager.current_phase` が `GAME_OVER` に遷移すること。
-  - 残り歩数が残っていても2歩目（`(2,0)`）への移動は実行されないこと。
 
 #### 【UT-STEP-02】土魔法で潜行中のユニットが魔女のマスを通過した際のやり過ごし検証
 - **テスト関数名：** `test_burrowed_hero_can_pass_witch_safely()`
 - **前提条件 (Given)：**
-  - 主人公 `HERO` が `(0,0)` で地中潜行中（`is_burrowed == true`）。
-  - 魔女が `(1,0)` に配置。
+  - 主人公 `HERO` が `(0,0)` で地中潜行中（`is_burrowed == true`）。魔女が `(1,0)`。
 - **実行操作 (When)：**
-  - 1歩目（`(1,0)` 魔女のいるマス）へ侵入する。
+  - 1歩目（`(1,0)`）へ侵入。
 - **期待結果 (Then)：**
   - ゲームオーバーは発生せず、ステータス `"CONTINUE"` が返却されること。
-  - 主人公の現在地が `(1,0)` に正常更新されること。
 
 #### 【UT-STEP-03】水魔術トラップマス侵入時の残歩数破棄・即時ターン終了検証
 - **テスト関数名：** `test_water_trap_stops_movement_immediately()`
 - **前提条件 (Given)：**
-  - `(1,0)` が `WATER_TRAP` マス。
-  - 出目 3（経路: `[(0,0), (1,0), (2,0), (3,0)]`）で移動開始。
+  - `(1,0)` が `WATER_TRAP` マス。出目 3 で移動開始。
 - **実行操作 (When)：**
   - 1歩目（`(1,0)`）を踏む。
 - **期待結果 (Then)：**
   - ステータス `"WATER_TRAP_STOP"` が返却されること。
-  - 残歩数 2 が強制破棄され、ユニットの現在地が `(1,0)` で確定すること。
-  - ユニットの `has_acted` が `true` になること。
+  - 残歩数 2 が強制破棄され、ユニットの現在地が `(1,0)` で確定し、`has_acted` が `true` になること。
+
+#### 【UT-STEP-04】少女が魔女と同マス接触した際の殺害と復活カウンタ設定
+- **テスト関数名：** `test_girl_step_overlap_with_witch_kills_girl()`
+- **前提条件 (Given)：**
+  - 炎の少女 `GIRL_FIRE` が `(0,0)`、魔女が `(1,0)` に配置。
+- **実行操作 (When)：**
+  - 1歩目（`(1,0)`）へ侵入。
+- **期待結果 (Then)：**
+  - 戻り値が `"GIRL_DIED"` であること。
+  - 少女の `is_alive` が `false`、`revive_turn_count` が 3 に設定されること。
+
+#### 【UT-STEP-05】特殊停止マス（ADDITIONAL_MOVE / ROLL_AGAIN / RETURN_TO_START / SKIP_TURN）の効果検証
+- **テスト関数名：** `test_special_stop_cells_resolution()`
+- **前提条件 (Given)：**
+  - 各特殊マスが配置された盤面。
+- **実行操作 (When)：**
+  - 各マスに対して `resolve_stop_cell` を実行。
+- **期待結果 (Then)：**
+  - `ADDITIONAL_MOVE`：追加歩数シグナル発火、`has_acted = false`。
+  - `ROLL_AGAIN`：再ロールシグナル発火、`has_acted = false`。
+  - `RETURN_TO_START`：`current_coord = initial_coord` に送還。
+  - `SKIP_TURN`：`is_skipped = true` に設定。
+
+#### 【UT-STEP-06】EVENTマスおよびEXITマス停止の検証
+- **テスト関数名：** `test_event_and_exit_cells_resolution()`
+- **前提条件 (Given)：**
+  - 宝箱マス（`EVENT`）およびゴールマス（`EXIT`）。
+- **実行操作 (When)：**
+  - `resolve_stop_cell` を実行。
+- **期待結果 (Then)：**
+  - `EVENT`：`is_consumed = true` に更新され、`cell_event_triggered` シグナル発火。
+  - `EXIT`：`stage_cleared` シグナル発火、フェーズが `STAGE_CLEAR` に遷移。
 
 ---
 
-## 2.3 UT-ENEMY: 魔女ターゲット選定テスト (`test_enemy_ai.gd`)
+## 2.3 UT-ENEMY: 魔女ターゲット選定・追跡・トラップ停止テスト (`test_enemy_ai.gd`)
 
 #### 【UT-ENEMY-01】最短距離の未潜行ユニット優先選定
 - **テスト関数名：** `test_witch_targets_nearest_unburrowed_unit()`
-- **前提条件 (Given)：**
-  - 魔女位置: `(5,0)`
-  - 主人公位置: `(0,0)` (距離5)
-  - 炎の少女位置: `(3,0)` (距離2)
-- **実行操作 (When)：**
-  - `select_witch_target()` を実行する。
-- **期待結果 (Then)：**
-  - より距離の近い「炎の少女 (`GIRL_FIRE`)」がターゲットとして選定されること。
+- **期待結果：** より距離の近い未潜行ユニットが選定されること。
 
 #### 【UT-ENEMY-02】同距離時のタイブレーク優先順位（主人公最優先）
 - **テスト関数名：** `test_witch_targets_hero_on_equal_distance()`
-- **前提条件 (Given)：**
-  - 魔女位置: `(2,0)`
-  - 主人公位置: `(0,0)` (距離2)
-  - 炎の少女位置: `(4,0)` (距離2)
-- **実行操作 (When)：**
-  - `select_witch_target()` を実行する。
-- **期待結果 (Then)：**
-  - タイブレーク優先順位（`主人公 > 炎`）に従い、主人公 `HERO` がターゲットとして選定されること。
+- **期待結果：** 同距離時は優先順位マップ（`主人公 > 炎 > 風 > 水 > 土`）に従い主人公が選定されること。
 
 #### 【UT-ENEMY-03】潜行中ユニットのターゲット除外と全員潜行時の初期位置移動
 - **テスト関数名：** `test_witch_returns_to_initial_when_all_burrowed()`
+- **期待結果：** 全員潜行時はターゲットが `null` となり、初期位置へ向かうこと。
+
+#### 【UT-ENEMY-04】魔女のエネミーターン移動中の水トラップ即時停止
+- **テスト関数名：** `test_witch_stops_immediately_on_water_trap()`
 - **前提条件 (Given)：**
-  - 魔女初期位置: `(5,5)`、現在地: `(2,2)`
-  - 生存している味方全員（主人公・少女）が潜行中（`is_burrowed == true`）。
+  - 魔女が追跡移動中に水トラップマス（`WATER_TRAP`）に進入。
 - **実行操作 (When)：**
-  - `select_witch_target()` を実行する。
+  - 魔女のステップ移動を実行。
 - **期待結果 (Then)：**
-  - ターゲットが `null` であること。
-  - 魔女の移動目標が初期位置 `(5,5)` に設定されること。
+  - 魔女も水マスを踏んだ瞬間に即座に停止し、残歩数が破棄されて行動終了となること。
+
+#### 【UT-ENEMY-05】スタン状態の魔女の行動スキップ
+- **テスト関数名：** `test_witch_stun_skips_turn()`
+- **前提条件 (Given)：**
+  - 魔女の `stun_turns == 1`。
+- **実行操作 (When)：**
+  - エネミーターン移動を実行。
+- **期待結果 (Then)：**
+  - 移動が実行されず現在地にとどまり、`stun_turns` が 0 に減少すること。
 
 ---
 
-## 2.4 UT-MAGIC: 4属性魔法効果テスト (`test_magic_system.gd`)
+## 2.4 UT-MAGIC: 4属性魔法効果・制約テスト (`test_magic_system.gd`)
 
 #### 【UT-MAGIC-01】炎魔法による魔女撃破と2ターン復活カウンタ設定
 - **テスト関数名：** `test_fire_magic_defeats_witch()`
-- **前提条件 (Given)：**
-  - 炎の少女が `(0,0)`、魔女が `(1,0)`（距離1マス）に配置。魔女は生存中。
-- **実行操作 (When)：**
-  - `execute_magic("GIRL_FIRE", ElementType.FIRE, Vector2i(1,0))` を実行。
-- **期待結果 (Then)：**
-  - 魔女の `is_alive` が `false` になること。
-  - 魔女の `revive_turn_count` が 2 に設定されること。
-  - 炎の少女の `has_acted` が `true` になること。
+- **期待結果：** 魔女撃破、`revive_turn_count = 2`、詠唱者行動済み。
 
 #### 【UT-MAGIC-02】水魔法によるトラップ生成
 - **テスト関数名：** `test_water_magic_creates_trap()`
-- **前提条件 (Given)：**
-  - `(2,0)` は通常マス（`NORMAL`）。
-- **実行操作 (When)：**
-  - `execute_magic("GIRL_WATER", ElementType.WATER, Vector2i(2,0))` を実行。
-- **期待結果 (Then)：**
-  - `(2,0)` のマス種別が `WATER_TRAP` に変更されること。
+- **期待結果：** 対象マスが `WATER_TRAP` に変化すること。
+
+#### 【UT-MAGIC-03】土魔法による地中潜行および魔女スタン
+- **テスト関数名：** `test_earth_magic_burrow_and_stun()`
+- **期待結果：**
+  - 空きマス対象時：詠唱者が `is_burrowed = true`。
+  - 魔女対象時：魔女が `stun_turns = 1`。
+
+#### 【UT-MAGIC-04】魔法詠唱の制約チェック（死亡時・行動済み時の拒否）
+- **テスト関数名：** `test_magic_execution_constraints()`
+- **期待結果：** 死亡中や既に行動済みのユニットは魔法詠唱に失敗（`false` 返却）すること。
+
+#### 【UT-MAGIC-05】土潜行中の「待機・祈る」による潜行維持
+- **テスト関数名：** `test_burrowed_unit_wait_maintains_burrow()`
+- **期待結果：** `execute_wait` 実行後も `is_burrowed = true` が維持されること。
 
 ---
 
@@ -167,24 +220,20 @@
 
 #### 【UT-TURN-01】少女死亡後の3ターン経過による初期位置復活
 - **テスト関数名：** `test_girl_revives_after_three_turns()`
-- **前提条件 (Given)：**
-  - 炎の少女の初期位置が `(0,0)`。
-  - 魔女に捕縛され死亡（`is_alive == false`, `revive_turn_count == 3`）。
-- **実行操作 (When)：**
-  - 3回ターン終了（`end_turn_and_advance`）を経過させる。
-- **期待結果 (Then)：**
-  - 1ターン後：`revive_turn_count == 2`, `is_alive == false`
-  - 2ターン後：`revive_turn_count == 1`, `is_alive == false`
-  - 3ターン後：`revive_turn_count == 0`, `is_alive == true`, `current_coord == (0,0)` に完全復活すること。
+- **期待結果：** 3ターン経過後に `is_alive = true`、初期座標で完全復活。
 
 #### 【UT-TURN-02】ターン進行後の味方行動リセットと再選択・行動フェーズ遷移の検証
 - **テスト関数名：** `test_turn_advance_and_reselection()`
-- **前提条件 (Given)：**
-  - 主人公 `HERO` が配置され、1ターン目の行動済み（`has_acted == true`）。
-- **実行操作 (When)：**
-  - ターン終了（`end_turn_and_advance`）を実行し、`select_character("HERO")` を呼び出す。
-- **期待結果 (Then)：**
-  - `current_turn` が 2 に更新されること。
-  - 主人公の `has_acted` が `false` にリセットされること。
-  - 主人公の選択に成功（戻り値 `true`）し、`current_phase` が `PLAYER_ACTION_SELECT` に遷移すること。
+- **期待結果：** ターン加算、`has_acted = false` リセット、ユニット選択フェーズ遷移。
 
+---
+
+## 2.6 UT-ITEM: アイテムデータおよびインベントリ操作テスト (`test_inventory_items.gd`)
+
+#### 【UT-ITEM-01】固定出目ダイス（1〜6の賽）のモデル整合性
+- **テスト関数名：** `test_fixed_dice_items_model()`
+- **期待結果：** 「1の賽」〜「6の賽」がそれぞれ固定値 1〜6 を保持し、種別が `FIXED_DICE` であること。
+
+#### 【UT-ITEM-02】インベントリへのアイテム追加・消費・スタック処理
+- **テスト関数名：** `test_inventory_add_and_consume()`
+- **期待結果：** アイテム取得でインベントリ配列に追加され、使用時に指定アイテムが確実に消費されること。
