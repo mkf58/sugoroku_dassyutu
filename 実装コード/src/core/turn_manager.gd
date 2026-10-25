@@ -115,26 +115,26 @@ func step_unit(unit: CharacterData, to_coord: Vector2i, remaining_steps: int) ->
 
 ## 停止マスイベント解決
 func resolve_stop_cell(character: CharacterData, cell: CellData) -> void:
-    match cell.cell_type:
-        Enums.CellType.EXIT:
-            current_phase = Enums.TurnPhase.STAGE_CLEAR
-            emit_signal("stage_cleared", stage_id)
-        Enums.CellType.ADDITIONAL_MOVE:
-            var steps = cell.event_params.get("steps", 2)
-            character.has_acted = false
-            emit_signal("additional_move_granted", character.character_id, steps)
-        Enums.CellType.RETURN_TO_START:
-            character.current_coord = character.initial_coord
-            emit_signal("returned_to_start_applied", character.character_id)
-        Enums.CellType.SKIP_TURN:
-            character.is_skipped = true
-        Enums.CellType.ROLL_AGAIN:
-            character.has_acted = false
-            emit_signal("roll_again_granted", character.character_id)
-        Enums.CellType.EVENT:
-            if not cell.is_consumed:
-                cell.is_consumed = true
-                emit_signal("cell_event_triggered", cell)
+    if cell.cell_type == Enums.CellType.EXIT:
+        current_phase = Enums.TurnPhase.STAGE_CLEAR
+        emit_signal("stage_cleared", stage_id)
+    elif cell.cell_type == Enums.CellType.ADDITIONAL_MOVE:
+        var steps = cell.event_params.get("steps", 2)
+        character.has_acted = false
+        emit_signal("additional_move_granted", character.character_id, steps)
+    elif cell.cell_type == Enums.CellType.RETURN_TO_START:
+        character.current_coord = character.initial_coord
+        emit_signal("returned_to_start_applied", character.character_id)
+    elif cell.cell_type == Enums.CellType.SKIP_TURN:
+        character.is_skipped = true
+    elif cell.cell_type == Enums.CellType.ROLL_AGAIN:
+        character.has_acted = false
+        emit_signal("roll_again_granted", character.character_id)
+    elif cell.cell_type == Enums.CellType.EVENT:
+        if not cell.is_consumed:
+            cell.is_consumed = true
+            emit_signal("cell_event_triggered", cell)
+
 
 
 ## 魔法実行（移動と二者択一）

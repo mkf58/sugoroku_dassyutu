@@ -137,4 +137,44 @@ func find_path_with_steps(start: Vector2i, goal: Vector2i, steps: int, obstacles
         return []
     return shortest
 
+## 任意座標から指定方向（dir）へ直線走査し、連続して繋がっている最遠のマスの座標を特定する
+func find_farthest_linear_cell(start: Vector2i, dir: Vector2i) -> Vector2i:
+    var current = start
+    while true:
+        var next_coord = current + dir
+        if not cells.has(next_coord):
+            break
+        var current_cell = cells[current]
+        if not current_cell.connections.get(dir, false):
+            break
+        current = next_coord
+    return current
+
+## 2点間が直線上にあり、その間の全マスが接続されていて障害物がないか（視界が通るか）
+func has_clear_line_of_sight(from_coord: Vector2i, to_coord: Vector2i, obstacles: Array[Vector2i] = []) -> bool:
+    if from_coord == to_coord:
+        return true
+    var diff = to_coord - from_coord
+    var dir = Vector2i.ZERO
+    if diff.x != 0 and diff.y == 0:
+        dir = Vector2i(sign(diff.x), 0)
+    elif diff.x == 0 and diff.y != 0:
+        dir = Vector2i(0, sign(diff.y))
+    else:
+        return false # 直線（水平・垂直）ではない
+        
+    var current = from_coord
+    while current != to_coord:
+        var next_c = current + dir
+        if not cells.has(current) or not cells.has(next_c):
+            return false
+        var cell = cells[current]
+        if not cell.connections.get(dir, false):
+            return false
+        if next_c in obstacles:
+            return false
+        current = next_c
+    return true
+
+
 
