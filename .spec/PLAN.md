@@ -2235,5 +2235,23 @@ GitHubの **「Branch Protection Rules（ブランチ保護ルール）」** と
 - 必要に応じて新規テストスイート（例：`test_special_cells.gd`, `test_item_inventory.gd`）を新設し、[test_runner.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_runner.gd) に統合。
 - 詳細設計書（[単体テスト仕様書_UT.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/単体テスト仕様書_UT.md)）も最新のテストケースに合わせて同期改定。
 
+**A79. [User]** 
+「進めていってほしいですが，この表をテスト仕様書として残してほしい」
+
+---
+
+### Q80. [Agent] spec-to-test スキルに基づく単体テスト仕様書マトリクス化とテストコード完全同期
+ユーザー様のご要望に基づき、提示した観点表を [詳細設計/単体テスト仕様書_UT.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/単体テスト仕様書_UT.md) として恒久ドキュメント化し、単体テストコードを完全同期させました。
+
+#### 1. 単体テスト仕様書（UT Specification）の構造
+- **4大観点での全ケース網羅：**
+  - **正常系（N01〜）：** 仕様通りの基本シナリオ・機能
+  - **準正常系（E01〜）：** `unit=null`, `board=null` 防御、死亡・行動済み操作拒否、存在しないIDなどの堅牢性
+  - **境界値（B01〜）：** 最小出目1・偶奇折り返し判定、炎魔法射程2マス境界、復活カウント1→0遷移
+  - **デシジョンテーブル（D01〜）：** リアルタイム接触判定、魔女追跡ターゲット選定、土魔法効果分岐
+- **テストコードとの完全1対1対応：**
+  - 全6テストスイート（`UT-BOARD`, `UT-STEP`, `UT-ENEMY`, `UT-MAGIC`, `UT-TURN`, `UT-ITEM`）の全関数名が仕様書のテスト項目IDと完全一致。
+
+
 
 

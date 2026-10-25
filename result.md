@@ -1,41 +1,27 @@
 # 作業結果サマリー (2026-10-25)
 
 ## 実行した内容のサマリー
-ユーザー様からのご要望「どちらかというとUTを改善したい」に基づき、初期PoC実装後に拡充された重要仕様・新機能（理不尽死防止、特殊停止マス、魔女水トラップ即停止、アイテムデータ等）に対する単体テスト（UT）スイートの大幅な改善・拡充を実施いたしました。
+ユーザー様からのご要望「提示したテスト観点マトリクスをテスト仕様書として残し、それに沿って進める」に基づき、以下を実施いたしました。
 
-1. **単体テスト詳細設計書の改定・同期：**
-   - [詳細設計/単体テスト仕様書_UT.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/単体テスト仕様書_UT.md) を全面的に更新。各スイートの追加テストケース（Given / When / Then）を詳細に定義。
-2. **既存テストスイートの改善・拡充：**
-   - **UT-BOARD（[test_grid_board.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_grid_board.gd)）：**
-     - 【UT-BOARD-05】障害物（未潜行魔女）マスを考慮した到達可能マス除外・理不尽死防止ロジックの単体テスト
-     - 【UT-BOARD-06】障害物マスを回避する迂回経路探索の単体テスト
-     - 【UT-BOARD-07】直線走査による最遠マス特定（`find_farthest_linear_cell`）の単体テスト
-   - **UT-STEP（[test_step_movement.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_step_movement.gd)）：**
-     - 【UT-STEP-04】少女が魔女と同マス接触した際の殺害判定（`GIRL_DIED`）と3ターン復活設定の単体テスト
-     - 【UT-STEP-05】特殊停止マス（`ADDITIONAL_MOVE` / `ROLL_AGAIN` / `RETURN_TO_START` / `SKIP_TURN`）の効果適用単体テスト
-     - 【UT-STEP-06】`EVENT` マス（消費フラグ・イベント発火）および `EXIT` マス（クリア発火）の単体テスト
-   - **UT-ENEMY（[test_enemy_ai.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_enemy_ai.gd)）：**
-     - 【UT-ENEMY-04】魔女が移動中に水トラップマスへ侵入した際の即時停止・残歩数破棄の単体テスト
-     - 【UT-ENEMY-05】スタン状態（`stun_turns > 0`）の魔女の行動スキップ単体テスト
-   - **UT-MAGIC（[test_magic_system.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_magic_system.gd)）：**
-     - 【UT-MAGIC-03】土魔法による地中潜行（自身）および魔女スタン（敵対象）の単体テスト
-     - 【UT-MAGIC-04】魔法詠唱制約チェック（死亡中・既に行動済みのユニットによる詠唱拒否）の単体テスト
-     - 【UT-MAGIC-05】土潜行中の「待機・祈る」による潜行維持の単体テスト
-3. **新規テストスイートの新設：**
-   - **UT-ITEM（[test_inventory_items.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_inventory_items.gd)）：**
-     - 【UT-ITEM-01】固定出目ダイス（「1の賽」〜「6の賽」）のモデルデータ整合性の単体テスト
-     - 【UT-ITEM-02】インベントリへのアイテム追加・指定アイテム消費処理の単体テスト
-4. **テストランナーの更新：**
-   - [test_runner.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_runner.gd) に `TestInventoryItems` を追加登録し、全6スイートが一括実行・集計される構成に更新。
-5. **PLAN & TODO の同期：**
-   - [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md) に Q78回答および Q79（UT改善・拡充方針）を記録。
-   - [.spec/TODO.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/TODO.md) にUT改善の完了を反映。
+1. **単体テスト仕様書（[詳細設計/単体テスト仕様書_UT.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/詳細設計/単体テスト仕様書_UT.md)）への観点表の恒久化：**
+   - 仕様書ベース・テスト生成スキル（`spec-to-test`）の体系に準拠し、**正常系（N）・準正常系（E）・境界値（B）・デシジョンテーブル（D）** の4大観点で全テストケースを網羅する表形式の仕様書として確定・保存いたしました。
+2. **テストコードとの完全1対1同期（全6スイート）：**
+   - 仕様書内の全テスト項目ID（N01〜, E01〜, B01〜, D01〜）と完全に一致するテスト関数を各テストスクリプトへ実装：
+     - **UT-BOARD（[test_grid_board.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_grid_board.gd)）：** 11ケース（最短経路、折り返し、最遠走査、視界、孤立、目的地障害物、不正経路、最小歩数、偶奇停止、障害物封鎖、迂回デシジョン）
+     - **UT-STEP（[test_step_movement.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_step_movement.gd)）：** 11ケース（歩行継続、通常到着、水トラップ停止、特殊マス停止、イベント/クリア、nullユニット防御、null盤面防御、消費済み再発火防止、初手接触、最終歩水トラップ、リアルタイム接触デシジョン）
+     - **UT-ENEMY（[test_enemy_ai.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_enemy_ai.gd)）：** 9ケース（最短距離、同距離主人公、全員潜行時初期位置、魔女水トラップ即停止、スタン中スキップ、生存味方不在防御、距離0、スタン減算、ターゲット選定デシジョン）
+     - **UT-MAGIC（[test_magic_system.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_magic_system.gd)）：** 10ケース（炎撃破、水トラップ生成、祈る潜行維持、行動時潜行解除、死亡時拒否、行動済み拒否、詠唱者不在防御、対象不在、炎射程境界、土魔法分岐デシジョン）
+     - **UT-TURN（[test_turn_lifecycle.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_turn_lifecycle.gd)）：** 8ケース（ターン進行、少女3T復活、魔女2T復活、死亡選択拒否、行動済み選択拒否、休み選択拒否、未登録選択拒否、復活境界値）
+     - **UT-ITEM（[test_inventory_items.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_inventory_items.gd)）：** 4ケース（固定賽モデル、インベントリ追加・消費、出目境界値1/6、空インベントリ推移）
+3. **PLAN.md & TODO.md の同期：**
+   - [.spec/PLAN.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/PLAN.md) の「2. 深堀り・QA」に A79回答および Q80 を記録。
+   - [.spec/TODO.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.spec/TODO.md) に仕様書マトリクス化およびテスト同期の完了を反映。
 
 ## プッシュしたブランチ名
 - **作業ブランチ：** `feature/unit-tests-improvement`（リモートプッシュ完了）
 
 ## 次に行うべき提案（ユーザー様へのメッセージ）
-1. **GitHub Actions での手動実行検証（推奨）：**
-   - GitHubリポジトリの **「Actions」** タブより、手動トリガー（`workflow_dispatch`）または本作業ブランチを `dev` にマージして、全6スイートの単体テストがすべてPass（緑チェック）することをご確認いただけます。
-2. **次期タスクへの移行：**
-   - 単体テストの基盤が強固に整いましたので、続いて本日の主要タスクである **「マップ移動・フロア遷移の実装（EXIT到達時の次階層ロード）」**、または **「結合テストの拡充・実施」** へ進めることをご提案いたします。
+1. **GitHub Actions でのテスト実行確認：**
+   - 本ブランチを `dev` にマージするか、手動トリガーで Actions を実行することで、全6スイート・計53ケースの単体テストが完全Passすることを確認できます。
+2. **フロア遷移（マップ移動）の実装へ着手：**
+   - 単体テストの観点表・コード基盤が完璧に整いましたので、次の主タスクである **「マップ移動・フロア遷移の実装（EXIT到達時の次階層ロード）」** へ進めることをご提案いたします。

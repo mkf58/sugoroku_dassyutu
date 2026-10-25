@@ -3,14 +3,18 @@ extends TestCase
 
 func run_all() -> void:
 	test_find_shortest_path_simple_line()
-	test_find_shortest_path_unreachable()
 	test_reachable_cells_with_steps_allowing_turnaround()
-	test_find_path_with_steps_turnaround()
-	test_reachable_cells_excludes_obstacles()
-	test_find_path_detours_obstacles()
 	test_find_farthest_linear_cell()
+	test_line_of_sight_clear()
+	test_find_shortest_path_unreachable()
+	test_find_path_goal_is_obstacle()
+	test_validate_path_disconnected()
+	test_reachable_cells_min_step_one()
+	test_reachable_cells_odd_vs_even_turnaround()
+	test_reachable_cells_blocked_by_obstacles()
+	test_find_path_detours_obstacles()
 
-## UT-BOARD-01: 最短経路探索（BFS）の検証
+## UT-BOARD-N01: 2点間最短経路探索
 func test_find_shortest_path_simple_line() -> void:
 	var board = GridBoard.new()
 	var c0 = CellData.new(Vector2i(0, 0), Enums.CellType.NORMAL)
@@ -23,96 +27,26 @@ func test_find_shortest_path_simple_line() -> void:
 	board.connect_cells(Vector2i(1, 0), Vector2i(2, 0))
 	
 	var path = board.find_shortest_path(Vector2i(0, 0), Vector2i(2, 0))
-	assert_eq(path.size(), 3, "UT-BOARD-01: Path size should be 3")
+	assert_eq(path.size(), 3, "UT-BOARD-N01: 経路長は3")
 	if path.size() == 3:
-		assert_eq(path[0], Vector2i(0, 0), "UT-BOARD-01: Start should be (0,0)")
-		assert_eq(path[1], Vector2i(1, 0), "UT-BOARD-01: Mid should be (1,0)")
-		assert_eq(path[2], Vector2i(2, 0), "UT-BOARD-01: Goal should be (2,0)")
+		assert_eq(path[0], Vector2i(0, 0), "UT-BOARD-N01: 始点は(0,0)")
+		assert_eq(path[1], Vector2i(1, 0), "UT-BOARD-N01: 中継は(1,0)")
+		assert_eq(path[2], Vector2i(2, 0), "UT-BOARD-N01: 終点は(2,0)")
 
-## UT-BOARD-02: 壁・未接続による到達不能の検証
-func test_find_shortest_path_unreachable() -> void:
-	var board = GridBoard.new()
-	var c0 = CellData.new(Vector2i(0, 0), Enums.CellType.NORMAL)
-	var c1 = CellData.new(Vector2i(1, 0), Enums.CellType.NORMAL)
-	board.add_cell(c0)
-	board.add_cell(c1)
-	# 接続しない
-	var path = board.find_shortest_path(Vector2i(0, 0), Vector2i(1, 0))
-	assert_true(path.is_empty(), "UT-BOARD-02: Path should be empty when disconnected")
-
-## UT-BOARD-03: 出目消費時の折り返し移動可能判定
+## UT-BOARD-N02: 出目通りの到達マス集合（折り返し含む）
 func test_reachable_cells_with_steps_allowing_turnaround() -> void:
-	var board = GridBoard.new()
-	var c0 = CellData.new(Vector2i(0, 0), Enums.CellType.NORMAL)
-	var c1 = CellData.new(Vector2i(1, 0), Enums.CellType.NORMAL)
-	var c2 = CellData.new(Vector2i(2, 0), Enums.CellType.NORMAL)
-	board.add_cell(c0)
-	board.add_cell(c1)
-	board.add_cell(c2)
-	board.connect_cells(Vector2i(0, 0), Vector2i(1, 0))
-	board.connect_cells(Vector2i(1, 0), Vector2i(2, 0))
-	
-	# 出目2での到達可能マスを取得
-	var reachables = board.get_reachable_cells_with_steps(Vector2i(0, 0), 2)
-	assert_true(reachables.has(Vector2i(2, 0)), "UT-BOARD-03: (2,0) should be reachable with 2 steps")
-	assert_true(reachables.has(Vector2i(0, 0)), "UT-BOARD-03: (0,0) turnaround should be reachable with 2 steps")
-	assert_false(reachables.has(Vector2i(1, 0)), "UT-BOARD-03: (1,0) should not be stopped at with 2 steps")
-
-## UT-BOARD-04: 指定歩数での折り返し経路生成の検証
-func test_find_path_with_steps_turnaround() -> void:
 	var board = GridBoard.new()
 	for x in range(3):
 		board.add_cell(CellData.new(Vector2i(x, 0), Enums.CellType.NORMAL))
 		if x > 0:
 			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
-			
-	# (0,0) から出目2で (0,0) へ戻る経路
-	var path = board.find_path_with_steps(Vector2i(0, 0), Vector2i(0, 0), 2)
-	assert_eq(path.size(), 3, "UT-BOARD-04: Path size should be 3 for 2 steps turnaround")
-	if path.size() == 3:
-		assert_eq(path[0], Vector2i(0, 0), "UT-BOARD-04: Start at (0,0)")
-		assert_eq(path[1], Vector2i(1, 0), "UT-BOARD-04: Step 1 at (1,0)")
-		assert_eq(path[2], Vector2i(0, 0), "UT-BOARD-04: End at (0,0)")
-
-## UT-BOARD-05: 障害物（未潜行魔女）マスを考慮した到達可能マス除外の検証
-func test_reachable_cells_excludes_obstacles() -> void:
-	var board = GridBoard.new()
-	for x in range(4):
-		board.add_cell(CellData.new(Vector2i(x, 0), Enums.CellType.NORMAL))
-		if x > 0:
-			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
-			
-	# (1,0) に障害物（未潜行魔女）を指定
-	var obstacles: Array[Vector2i] = [Vector2i(1, 0)]
-	var reachables = board.get_reachable_cells_with_steps(Vector2i(0, 0), 2, obstacles)
 	
-	assert_false(reachables.has(Vector2i(1, 0)), "UT-BOARD-05: 障害物マス(1,0)は到達可能に含まれないこと")
-	assert_false(reachables.has(Vector2i(2, 0)), "UT-BOARD-05: 障害物の先の(2,0)へは通り抜けできないこと")
-	assert_true(reachables.is_empty(), "UT-BOARD-05: 直線で障害物を越えられないため到達可能マスは0件")
+	var reachables = board.get_reachable_cells_with_steps(Vector2i(0, 0), 2)
+	assert_true(reachables.has(Vector2i(2, 0)), "UT-BOARD-N02: 直進(2,0)へ到達可能")
+	assert_true(reachables.has(Vector2i(0, 0)), "UT-BOARD-N02: 折り返し(0,0)へ到達可能")
+	assert_false(reachables.has(Vector2i(1, 0)), "UT-BOARD-N02: (1,0)は出目2では停止不可")
 
-## UT-BOARD-06: 障害物マスを回避する迂回経路探索の検証
-func test_find_path_detours_obstacles() -> void:
-	var board = GridBoard.new()
-	# (0,0) - (1,0) - (2,0) メインストリート
-	#   |               |
-	# (0,1) - (1,1) - (2,1) 迂回路
-	for y in range(2):
-		for x in range(3):
-			board.add_cell(CellData.new(Vector2i(x, y), Enums.CellType.NORMAL))
-			if x > 0:
-				board.connect_cells(Vector2i(x - 1, y), Vector2i(x, y))
-	board.connect_cells(Vector2i(0, 0), Vector2i(0, 1))
-	board.connect_cells(Vector2i(2, 0), Vector2i(2, 1))
-
-	# メインストリート中央 (1,0) を障害物に指定
-	var obstacles: Array[Vector2i] = [Vector2i(1, 0)]
-	var path = board.find_shortest_path(Vector2i(0, 0), Vector2i(2, 0), obstacles)
-	
-	assert_false(path.is_empty(), "UT-BOARD-06: 迂回路を通って到達できること")
-	assert_false(path.has(Vector2i(1, 0)), "UT-BOARD-06: 経路に障害物マスが含まれないこと")
-	assert_eq(path.size(), 5, "UT-BOARD-06: 迂回経路の長さは5 (0,0)->(0,1)->(1,1)->(2,1)->(2,0)")
-
-## UT-BOARD-07: 直線走査による最遠マス特定の検証
+## UT-BOARD-N03: 直線走査（最遠マス）
 func test_find_farthest_linear_cell() -> void:
 	var board = GridBoard.new()
 	for x in range(5):
@@ -121,4 +55,102 @@ func test_find_farthest_linear_cell() -> void:
 			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
 			
 	var farthest = board.find_farthest_linear_cell(Vector2i(1, 0), Vector2i(1, 0))
-	assert_eq(farthest, Vector2i(4, 0), "UT-BOARD-07: 右方向走査で(4,0)が最遠マスとして返ること")
+	assert_eq(farthest, Vector2i(4, 0), "UT-BOARD-N03: 右方向走査で(4,0)が最遠マス")
+
+## UT-BOARD-N04: 直線視界判定
+func test_line_of_sight_clear() -> void:
+	var board = GridBoard.new()
+	for x in range(4):
+		board.add_cell(CellData.new(Vector2i(x, 0), Enums.CellType.NORMAL))
+		if x > 0:
+			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
+			
+	var has_los = board.has_clear_line_of_sight(Vector2i(0, 0), Vector2i(3, 0))
+	assert_true(has_los, "UT-BOARD-N04: 直線上に壁がなければ視界クリア")
+
+## UT-BOARD-E01: 未接続・孤立マスへの探索
+func test_find_shortest_path_unreachable() -> void:
+	var board = GridBoard.new()
+	board.add_cell(CellData.new(Vector2i(0, 0), Enums.CellType.NORMAL))
+	board.add_cell(CellData.new(Vector2i(1, 0), Enums.CellType.NORMAL))
+	# 接続しない
+	var path = board.find_shortest_path(Vector2i(0, 0), Vector2i(1, 0))
+	assert_true(path.is_empty(), "UT-BOARD-E01: 未接続時は空配列が返却されること")
+
+## UT-BOARD-E02: 障害物マスへの直接進入拒否
+func test_find_path_goal_is_obstacle() -> void:
+	var board = GridBoard.new()
+	for x in range(3):
+		board.add_cell(CellData.new(Vector2i(x, 0), Enums.CellType.NORMAL))
+		if x > 0:
+			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
+			
+	var obstacles: Array[Vector2i] = [Vector2i(2, 0)]
+	var path = board.find_path_with_steps(Vector2i(0, 0), Vector2i(2, 0), 2, obstacles)
+	assert_true(path.is_empty(), "UT-BOARD-E02: 目的地自体が障害物の場合は到達不可")
+
+## UT-BOARD-E03: 不正経路のバリデーション
+func test_validate_path_disconnected() -> void:
+	var board = GridBoard.new()
+	board.add_cell(CellData.new(Vector2i(0, 0), Enums.CellType.NORMAL))
+	board.add_cell(CellData.new(Vector2i(1, 0), Enums.CellType.NORMAL))
+	# 未接続
+	var invalid_path: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0)]
+	var is_valid = board.validate_path(invalid_path, 1)
+	assert_false(is_valid, "UT-BOARD-E03: 未接続マス間の経路は無効と判定されること")
+
+## UT-BOARD-B01: 最小出目（出目1）の移動
+func test_reachable_cells_min_step_one() -> void:
+	var board = GridBoard.new()
+	for x in range(3):
+		board.add_cell(CellData.new(Vector2i(x, 0), Enums.CellType.NORMAL))
+		if x > 0:
+			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
+			
+	var reachables = board.get_reachable_cells_with_steps(Vector2i(1, 0), 1)
+	assert_eq(reachables.size(), 2, "UT-BOARD-B01: 出目1では左右2マスのみ到達可能")
+	assert_true(reachables.has(Vector2i(0, 0)), "UT-BOARD-B01: 左マス到達可能")
+	assert_true(reachables.has(Vector2i(2, 0)), "UT-BOARD-B01: 右マス到達可能")
+	assert_false(reachables.has(Vector2i(1, 0)), "UT-BOARD-B01: 現在地へは戻れない")
+
+## UT-BOARD-B02: 偶数出目 vs 奇数出目での現在地停止判定
+func test_reachable_cells_odd_vs_even_turnaround() -> void:
+	var board = GridBoard.new()
+	for x in range(3):
+		board.add_cell(CellData.new(Vector2i(x, 0), Enums.CellType.NORMAL))
+		if x > 0:
+			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
+			
+	var odd_reachables = board.get_reachable_cells_with_steps(Vector2i(0, 0), 3)
+	var even_reachables = board.get_reachable_cells_with_steps(Vector2i(0, 0), 2)
+	assert_false(odd_reachables.has(Vector2i(0, 0)), "UT-BOARD-B02: 奇数出目(3)では現在地へ停止不可")
+	assert_true(even_reachables.has(Vector2i(0, 0)), "UT-BOARD-B02: 偶数出目(2)では現在地へ停止可能")
+
+## UT-BOARD-B03: 障害物による完全封鎖
+func test_reachable_cells_blocked_by_obstacles() -> void:
+	var board = GridBoard.new()
+	for x in range(4):
+		board.add_cell(CellData.new(Vector2i(x, 0), Enums.CellType.NORMAL))
+		if x > 0:
+			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
+			
+	var obstacles: Array[Vector2i] = [Vector2i(1, 0)]
+	var reachables = board.get_reachable_cells_with_steps(Vector2i(0, 0), 2, obstacles)
+	assert_true(reachables.is_empty(), "UT-BOARD-B03: 通路が障害物で封鎖された場合、到達可能マスは0件")
+
+## UT-BOARD-D01: 障害物マスを回避する迂回経路探索
+func test_find_path_detours_obstacles() -> void:
+	var board = GridBoard.new()
+	for y in range(2):
+		for x in range(3):
+			board.add_cell(CellData.new(Vector2i(x, y), Enums.CellType.NORMAL))
+			if x > 0:
+				board.connect_cells(Vector2i(x - 1, y), Vector2i(x, y))
+	board.connect_cells(Vector2i(0, 0), Vector2i(0, 1))
+	board.connect_cells(Vector2i(2, 0), Vector2i(2, 1))
+
+	var obstacles: Array[Vector2i] = [Vector2i(1, 0)]
+	var path = board.find_shortest_path(Vector2i(0, 0), Vector2i(2, 0), obstacles)
+	assert_false(path.is_empty(), "UT-BOARD-D01: 迂回路経由で到達できること")
+	assert_false(path.has(Vector2i(1, 0)), "UT-BOARD-D01: 障害物マスを含まないこと")
+	assert_eq(path.size(), 5, "UT-BOARD-D01: 迂回経路長は5")
