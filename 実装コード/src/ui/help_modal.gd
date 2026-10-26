@@ -15,6 +15,10 @@ func _ready() -> void:
 func open() -> void:
     visible = true
 
+func show_modal() -> void:
+    open()
+
+
 func _input(event: InputEvent) -> void:
     if visible and event is InputEventMouseButton and event.pressed:
         if event.button_index == MOUSE_BUTTON_RIGHT:

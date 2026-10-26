@@ -71,21 +71,36 @@ func find_shortest_path(start: Vector2i, goal: Vector2i, obstacles: Array[Vector
     return path
 
 ## 指定歩数（出目）で到達可能なマスの集合を計算（折り返し移動許可、障害物回避対応）
+## なお、EXIT（脱出）マスは出目が余っていても（移動可能距離内であれば）到達可能マスに含める
 ## 戻り値: Dictionary (Vector2i -> bool)
 func get_reachable_cells_with_steps(start: Vector2i, steps: int, obstacles: Array[Vector2i] = []) -> Dictionary:
     var current_states: Dictionary = {start: true}
+    var reachable_exits: Dictionary = {}
     for s in range(steps):
         var next_states: Dictionary = {}
         for c in current_states.keys():
             for n in get_accessible_neighbors(c, obstacles):
                 next_states[n] = true
+                if cells.has(n) and cells[n].cell_type == Enums.CellType.EXIT:
+                    reachable_exits[n] = true
         current_states = next_states
+        
+    for ec in reachable_exits.keys():
+        current_states[ec] = true
+        
     return current_states
 
 ## 指定された経路（座標配列）が出目と合致し、接続が有効か検証する
 func validate_path(path: Array[Vector2i], expected_steps: int) -> bool:
-    if path.size() != expected_steps + 1:
+    if path.is_empty():
         return false
+    var is_exit = cells.has(path[-1]) and cells[path[-1]].cell_type == Enums.CellType.EXIT
+    if is_exit:
+        if path.size() - 1 > expected_steps:
+            return false
+    else:
+        if path.size() != expected_steps + 1:
+            return false
     for i in range(path.size() - 1):
         var c = path[i]
         var n = path[i + 1]
@@ -94,17 +109,23 @@ func validate_path(path: Array[Vector2i], expected_steps: int) -> bool:
             return false
     return true
 
-## startからgoalへ、正確にsteps歩で到達する有効な経路（折り返し含む）を探索する
+## startからgoalへ、正確にsteps歩（またはEXITへの出目余り）で到達する有効な経路（折り返し含む）を探索する
 func find_path_with_steps(start: Vector2i, goal: Vector2i, steps: int, obstacles: Array[Vector2i] = []) -> Array[Vector2i]:
     if steps <= 0:
         return [start] if start == goal else []
     if goal in obstacles:
         return []
         
-    # 最短経路と歩数が一致する場合はそれを優先
+    # EXITマスの場合：出目が余っていても（最短経路長 <= steps + 1）到達可能
     var shortest = find_shortest_path(start, goal, obstacles)
+    if cells.has(goal) and cells[goal].cell_type == Enums.CellType.EXIT:
+        if not shortest.is_empty() and (shortest.size() - 1) <= steps:
+            return shortest
+            
+    # 最短経路と歩数が一致する場合はそれを優先
     if shortest.size() == steps + 1:
         return shortest
+
         
     # 折り返し移動を含む歩数固定の探索（重複状態枝刈り付きBFS）
     var queue: Array = [[start]]

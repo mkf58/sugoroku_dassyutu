@@ -65,7 +65,7 @@ func _ready() -> void:
 	_bind_events()
 	_init_poc_stage()
 
-func _init_poc_stage() -> void:
+func _init_poc_stage(preserve_inventory: bool = false) -> void:
 	# 既存の盤面表示・ハイライト・経路・コマを完全初期化
 	board_view.clear_all()
 	game_over_screen.visible = false
@@ -76,16 +76,18 @@ func _init_poc_stage() -> void:
 	has_pending_additional_move = false
 	has_pending_roll_again = false
 
-	# インベントリ初期化（テスト用に「1の賽」を初期所持）
-	inventory.clear()
-	inventory.append({
-		"id": "DICE_1_INIT",
-		"name": "1の賽",
-		"desc": "出目が必ず【1】になる固定ダイス",
-		"value": 1,
-		"type": "FIXED_DICE",
-		"icon_text": "🎲"
-	})
+	# インベントリ初期化（引き継ぎ指定がない場合のみ初期ダイスをセット）
+	if not preserve_inventory:
+		inventory.clear()
+		inventory.append({
+			"id": "DICE_1_INIT",
+			"name": "1の賽",
+			"desc": "出目が必ず【1】になる固定ダイス",
+			"value": 1,
+			"type": "FIXED_DICE",
+			"icon_text": "🎲"
+		})
+
 
 	tm = TurnManager.new()
 	_bind_turn_manager_events()
@@ -207,7 +209,7 @@ func _bind_events() -> void:
 	game_over_screen.retry_pressed.connect(_on_retry)
 	game_over_screen.title_pressed.connect(_on_title_return)
 	
-	stage_clear_screen.retry_pressed.connect(_on_retry)
+	stage_clear_screen.retry_pressed.connect(_on_stage_clear_retry)
 	stage_clear_screen.title_pressed.connect(_on_title_return)
 
 func _bind_turn_manager_events() -> void:
@@ -258,9 +260,12 @@ func _bind_turn_manager_events() -> void:
 			var hero = tm.characters["HERO"]
 			var p = board_view.get_piece("HERO")
 			if p:
+				if p.current_tween and p.current_tween.is_valid():
+					p.current_tween.kill()
 				p.position = Vector2(hero.initial_coord.x * 64 + 16, hero.initial_coord.y * 64 + 16)
 			hud.log_message("[Cell] 振り出しマス！スタート位置に戻されました。")
 	)
+
 
 
 
@@ -493,8 +498,10 @@ func _start_hero_movement(path: Array[Vector2i]) -> void:
 			is_moving = false
 			current_dice_roll = 0
 			hud.hide_dice_result()
+			hero_piece.position = Vector2(hero.current_coord.x * 64 + 16, hero.current_coord.y * 64 + 16)
 			hud.log_message("[Move] 主人公が %s に停止しました。" % str(hero.current_coord))
 			if tm.current_phase != Enums.TurnPhase.GAME_OVER and tm.current_phase != Enums.TurnPhase.STAGE_CLEAR:
+
 				if has_pending_additional_move:
 					has_pending_additional_move = false
 					hud.log_message("[Cell] +%dマスに停止！追加で%dマス移動します！" % [pending_additional_steps, pending_additional_steps])
@@ -618,12 +625,21 @@ func _on_retry() -> void:
 	item_select_modal.visible = false
 	hud.set_action_buttons_enabled(true)
 	hud.log_message("[Retry] ステージを最初からやり直します。")
-	_init_poc_stage()
+	_init_poc_stage(false)
+
+func _on_stage_clear_retry() -> void:
+	game_over_screen.visible = false
+	stage_clear_screen.visible = false
+	action_command_menu.visible = false
+	item_select_modal.visible = false
+	hud.set_action_buttons_enabled(true)
+	hud.log_message("[Clear Retry] クリア時のアイテムを保持して再挑戦します。")
+	_init_poc_stage(true)
 
 func _on_title_return() -> void:
+
 	DebugLogger.info("MainGame._on_title_return", "タイトル画面へ遷移します")
 	if get_node_or_null("/root/SceneManager"):
 		get_node("/root/SceneManager").change_to_title()
 	else:
 		get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
-

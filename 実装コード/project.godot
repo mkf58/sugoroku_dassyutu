@@ -23,7 +23,6 @@ config/features=PackedStringArray("4.7", "Forward Plus")
 
 SceneManager="*res://src/core/scene_manager.gd"
 
-
 [display]
 
 window/size/viewport_width=1280

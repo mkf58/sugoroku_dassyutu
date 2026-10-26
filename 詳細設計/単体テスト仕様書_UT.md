@@ -28,7 +28,9 @@
 | **正常系** | **UT-BOARD-N02** | `test_reachable_cells_with_steps_allowing_turnaround` | 3マスの直線盤面、始点 `(0,0)`、出目 2 | `(2,0)`（直進）および `(0,0)`（折り返し）が到達可能マスに含まれること |
 | **正常系** | **UT-BOARD-N03** | `test_find_farthest_linear_cell` | 5マスの直線盤面（`(0,0)`〜`(4,0)`）、走査方向 `Vector2i(1,0)` | 端のマス `(4,0)` が最遠マスとして正しく返却されること |
 | **正常系** | **UT-BOARD-N04** | `test_line_of_sight_clear` | 4マスの直線盤面、始点 `(0,0)`、終点 `(3,0)` | 間に壁がなければ `has_clear_line_of_sight` が `true` を返すこと |
+| **正常系** | **UT-BOARD-N05** | `test_reachable_cells_and_path_to_exit_with_excess_steps` | 距離2マスの位置にEXITマス、出目5（余り3）で振った場合 | 到達可能マスにEXITが含まれ、最短歩数で停止する有効経路が算出されること |
 | **準正常系** | **UT-BOARD-E01** | `test_find_shortest_path_unreachable` | `(0,0)` と `(1,0)` の間に接続が存在しない未接続盤面 | 到達不能として空配列 `[]` が安全に返却されること |
+
 | **準正常系** | **UT-BOARD-E02** | `test_find_path_goal_is_obstacle` | 目的地 `(2,0)` に障害物（未潜行魔女）が存在 | 目的地自体が進入禁止のため空配列 `[]` が返却されること |
 | **準正常系** | **UT-BOARD-E03** | `test_validate_path_disconnected` | 途中のマス接続が途切れている座標配列 | `validate_path` の戻り値が `false` であること |
 | **境界値** | **UT-BOARD-B01** | `test_reachable_cells_min_step_one` | 3マスの直線盤面、始点 `(1,0)`、出目 1 | 隣接マス `(0,0)` と `(2,0)` のみ到達可能（現在地への折り返し不可） |

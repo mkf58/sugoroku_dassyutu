@@ -13,6 +13,8 @@ func run_all() -> void:
 	test_reachable_cells_odd_vs_even_turnaround()
 	test_reachable_cells_blocked_by_obstacles()
 	test_find_path_detours_obstacles()
+	test_reachable_cells_and_path_to_exit_with_excess_steps()
+
 
 ## UT-BOARD-N01: 2点間最短経路探索
 func test_find_shortest_path_simple_line() -> void:
@@ -154,3 +156,22 @@ func test_find_path_detours_obstacles() -> void:
 	assert_false(path.is_empty(), "UT-BOARD-D01: 迂回路経由で到達できること")
 	assert_false(path.has(Vector2i(1, 0)), "UT-BOARD-D01: 障害物マスを含まないこと")
 	assert_eq(path.size(), 5, "UT-BOARD-D01: 迂回経路長は5")
+
+## UT-BOARD-N05: EXITマスへの出目余り到達（ぴったりでなくても到達可能）
+func test_reachable_cells_and_path_to_exit_with_excess_steps() -> void:
+	var board = GridBoard.new()
+	board.add_cell(CellData.new(Vector2i(0, 0), Enums.CellType.NORMAL))
+	board.add_cell(CellData.new(Vector2i(1, 0), Enums.CellType.NORMAL))
+	board.add_cell(CellData.new(Vector2i(2, 0), Enums.CellType.EXIT))
+	board.connect_cells(Vector2i(0, 0), Vector2i(1, 0))
+	board.connect_cells(Vector2i(1, 0), Vector2i(2, 0))
+	
+	# 距離は2マスだが、出目5（余り3）で振った場合
+	var reachables = board.get_reachable_cells_with_steps(Vector2i(0, 0), 5)
+	assert_true(reachables.has(Vector2i(2, 0)), "UT-BOARD-N05: 出目が余っていてもEXITマスは到達可能に含まれること")
+	
+	var path = board.find_path_with_steps(Vector2i(0, 0), Vector2i(2, 0), 5)
+	assert_eq(path.size(), 3, "UT-BOARD-N05: EXITマスへの経路は最短2歩で返却されること")
+	assert_eq(path[-1], Vector2i(2, 0), "UT-BOARD-N05: 経路の終点がEXITマスであること")
+	assert_true(board.validate_path(path, 5), "UT-BOARD-N05: 出目余りでもEXITへの経路は有効と判定されること")
+
