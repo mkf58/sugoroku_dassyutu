@@ -1,27 +1,24 @@
 # 作業完了報告 (Result)
 
 ## 1. 実行内容サマリー
-1. **フロア遷移システム（StageData & StageRepository & 階層ロード基盤）の完成：**
-   - 階層ごとのデータ構造（ID、階層名、盤面GridBoard、魔女配置、同行少女・属性、初期アイテム、次階層ID）を保持する `StageData` クラスを作成しました。
-   - 全6ステージ（Stage 1: チュートリアル階、Stage 2: 炎の少女、Stage 3: 水の少女、Stage 4: 風の少女、Stage 5: 土の少女、Stage 6: 最終脱出地点）を定義・提供する `StageRepository` を実装しました。
-   - `MainGame` にてハードコード初期化を廃止し、`load_stage(stage_id, preserve_inventory)` により動的にステージを切り替え、EXITマス到達後のクリア画面から「次の階層へ進む」ボタンでアイテムを引き継いだままシームレスに次階層へ遷移できるようにしました。
-2. **単体テストスイート（UT-STAGE）の追加・拡充：**
-   - 単体テスト仕様書に「2.8 UT-STAGE」（N01〜N03, E01, B01）を追加策定し、テストコード [test_stage_system.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_stage_system.gd) を作成・登録しました。
-   - 基底クラス `TestCase` に `assert_null()` / `assert_not_null()` を追加しました。
-3. **CI実行ハングの解消とフェイルセーフ設定：**
-   - 不具合修正時の未宣言変数 `has_pending_roll_again` を補完修正し、コンパイルエラーおよびGodotプロセスの待機ハングを解消しました。
-   - `.github/workflows/ci.yml` に `timeout-minutes: 3` を追加し、予期せぬスクリプトエラー時にも最大3分で自動終了するよう安全性を向上させました。
-   - **GitHub Actions CI（Ubuntu / Godot 4.3）にて全8スイート、TOTAL 178テストが100% Pass（実行時間11秒）することを確認しました。**
+1. **「devマージ前自動テスト必須化」ルールの正式策定と明文化：**
+   - [AGENTS.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/AGENTS.md): プロジェクト原則に「**【重要・必須】開発統合ブランチ dev へのマージ前に、必ず自動テストを実施すること。** 作業用ブランチ（`feature/xxx`）をプッシュした段階で自動テスト（CIまたはローカルテスト）を実行・監視し、全テスト項目が100%合格（TOTAL FAILED: 0）したことを確認してからのみ dev へマージすること。テスト失敗やエラーがある状態での dev へのマージは厳禁とする。」と明記しました。
+   - [.agent/memory/MEMORY.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.agent/memory/MEMORY.md): CI/CD運用原則の最重要項目として「devマージ前の自動テスト必須原則」を記録しました。
+2. **GitHub Actions CI トリガーの拡張：**
+   - [.github/workflows/ci.yml](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/.github/workflows/ci.yml): `branches: [ 'feature/**', 'fix/**', dev, main ]` に拡張し、作業ブランチ作成・プッシュの時点でGitHub Actionsの自動テストが即時実行されるように設定しました。
+3. **新運用フローの実践と検証：**
+   - 作業ブランチ `fix/enforce-premerge-testing` を作成してプッシュし、CI（Run ID: 40326429828）が発火。
+   - **全178テストが13秒で100% Passしたことを確認してから `dev` へマージ＆プッシュ完了**いたしました。
 
 ## 2. プッシュしたブランチ名
-- **作業ブランチ：** `feature/floor-transition-system`
+- **作業ブランチ：** `fix/enforce-premerge-testing`
 - **開発統合ブランチ：** `dev`
 
 ## 3. 次に行うべき提案（ユーザーへのメッセージ）
-フロア遷移の基幹システムおよびテストが完成し、Stage 1 〜 Stage 6 までの階層ロード・引き継ぎの土台が整いました。
-次に行うべきステップとして、以下の2つをご提案いたします：
+運用ルールの強化が完了し、今後の開発においても「作業ブランチpush → 自動テスト100%合格を確認 → devへマージ」という安全な開発サイクルが確立されました。
+次は以下のいずれかの開発ステップへ進めることをご提案いたします：
 
 1. **結合テストの実施・検証（推奨）：**
-   - 基本設計書に基づいて作成済みの結合テスト仕様書および自動テストコードを実行し、全体を通した統合動作（画面遷移、ターン進行、魔女AI、フロアクリア遷移）を検証する。
+   - 作成済みの結合テスト仕様書および自動テストコードを実行し、全体を通した統合動作（画面遷移、ターン進行、魔女AI、フロアクリア遷移）を検証する。
 2. **本番用マップデータ・イベントの本格設計：**
-   - 現在テスト用の仮置き（一直線等）となっているStage 1〜Stage 6について、マップ形状、水トラップ・宝箱・特殊マスの配置や演出イベントを作り込んでいく。
+   - Stage 1〜Stage 6 の盤面レイアウト、マス配置（水トラップ、+2マス、宝箱マス、戻るマス）を本格設計する。
