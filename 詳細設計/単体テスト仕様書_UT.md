@@ -145,3 +145,17 @@
 | **正常系** | **UT-ITEM-N02** | `test_inventory_add_and_consume` | インベントリへの追加、および `pop_at` による消費 | 指定インデックスのアイテムが取り出され、インベントリ残数が正しく減少 |
 | **境界値** | **UT-ITEM-B01** | `test_dice_value_boundaries` | 最小出目（1の賽: `value=1`）および最大出目（6の賽: `value=6`） | 境界値が正しく設定・保持されること |
 | **境界値** | **UT-ITEM-B02** | `test_inventory_empty_to_populated` | 所持数 0 個 → 1 個追加 → 消費で 0 個 | インベントリ要素数の整合性が担保されること |
+
+---
+
+### 2.7 UT-SCENE：画面遷移管理・パラメータ保持 (`test_scene_manager.gd`)
+
+| 区分 | テスト項目ID | テスト関数名 | 入力・事前条件 | 期待される判定・処理結果 |
+| :--- | :--- | :--- | :--- | :--- |
+| **正常系** | **UT-SCENE-N01** | `test_change_scene_registers_target` | 遷移先パスとパラメータを指定して `change_scene` 呼び出し | ターゲットパスおよび渡したパラメータが `SceneManager` に正しく保持されること |
+| **正常系** | **UT-SCENE-N02** | `test_scene_param_get_and_set` | `set_param("stage_id", "STAGE_1")` 実行 | `get_param("stage_id")` で `"STAGE_1"` が取得できること |
+| **正常系** | **UT-SCENE-N03** | `test_convenience_methods` | `change_to_title()`, `change_to_main_game()` 呼び出し | 定義された定数パス（`SCENE_TITLE`, `SCENE_MAIN_GAME`）が正しくターゲットに設定されること |
+| **準正常系** | **UT-SCENE-E01** | `test_prevent_double_transition` | 遷移中フラグ `is_transitioning = true` の状態で再度 `change_scene` 呼び出し | 重複実行が無視（スキップ）され、最初の遷移先が保持されること |
+| **準正常系** | **UT-SCENE-E02** | `test_invalid_param_key` | 未設定のパラメータキーを `get_param("unknown", "default_val")` で取得 | 指定したデフォルト値 `"default_val"` が安全に返却されること |
+| **境界値** | **UT-SCENE-B01** | `test_empty_params_dictionary` | パラメータに空の辞書 `{}` を渡して遷移 | エラーなく受け付けられ、パラメータがクリア/空辞書となること |
+

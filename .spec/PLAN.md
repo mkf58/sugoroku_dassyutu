@@ -2252,6 +2252,43 @@ GitHubの **「Branch Protection Rules（ブランチ保護ルール）」** と
 - **テストコードとの完全1対1対応：**
   - 全6テストスイート（`UT-BOARD`, `UT-STEP`, `UT-ENEMY`, `UT-MAGIC`, `UT-TURN`, `UT-ITEM`）の全関数名が仕様書のテスト項目IDと完全一致。
 
+---
+
+### Q81. [Agent] 全体的な画面遷移（Scene Transition）の設計・実装方針について
+ユーザー様より「フロア遷移ではなく、全体的な画面遷移をとりあえず作りましょう」とのご指示をいただきました。
+基本設計書（[画面設計書_および_画面遷移図.md](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/基本設計/画面設計書_および_画面遷移図.md)）に基づき、全体的な画面遷移システムの構築方針について確認・ご提案いたします。
+
+#### 1. 遷移フローと対象画面
+現在、個別シーンとして `main_game.tscn`, `game_over_screen.tscn`, `stage_clear_screen.tscn` が存在しています。
+これらを束ねる全体遷移として以下を構築します：
+
+```mermaid
+stateDiagram-v2
+    [*] --> TitleScreen : 起動 (project.godotのmain_scene)
+    TitleScreen --> MainGameScreen : 「はじめから」/「つづきから」
+    MainGameScreen --> StageClearScreen : 脱出マス(EXIT)到達
+    StageClearScreen --> MainGameScreen : 「次の階層へ進む」
+    StageClearScreen --> TitleScreen : 「タイトルへ戻る」
+    MainGameScreen --> GameOverScreen : 魔女に捕縛
+    GameOverScreen --> MainGameScreen : 「この階層をやり直す」
+    GameOverScreen --> TitleScreen : 「タイトルへ戻る」
+```
+
+#### 2. 遷移マネージャー（SceneManager）の構成案
+- **Autoload（シングルトン）`SceneManager` の導入：**
+  - シーン切替（`change_scene_to_file`）を一元管理し、画面間のパラメータ（選択ステージ、引き継ぎデータ等）を安全に保持・受け渡し。
+  - **トランジション演出（暗転フェード）：**
+    - ホラーゲームの質感に合わせ、画面遷移時にシンプルな黒フェードアウト＆フェードイン（0.3秒〜0.5秒程度）を挟むことで、不自然な画面のチラつきやカクつきを防止。
+- **タイトル画面（`title_screen.tscn` / `title_screen.gd`）の新設：**
+  - タイトルロゴ、霧・不穏な雰囲気の背景レイアウト。
+  - 「はじめから」「つづきから（セーブデータ存在時のみ活性）」「設定（ConfigModal）」「ゲーム終了」ボタン。
+  - `project.godot` の `run/main_scene` を `title_screen.tscn` に変更。
+
+**A81. [User]** 
+「作ってください．足りなければ言います」
+
+
+
 
 
 

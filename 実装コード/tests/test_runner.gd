@@ -6,6 +6,7 @@ const TestEnemyAI = preload("res://tests/test_enemy_ai.gd")
 const TestMagicSystem = preload("res://tests/test_magic_system.gd")
 const TestTurnLifecycle = preload("res://tests/test_turn_lifecycle.gd")
 const TestInventoryItems = preload("res://tests/test_inventory_items.gd")
+const TestSceneManager = preload("res://tests/test_scene_manager.gd")
 
 func _init() -> void:
 	print("========================================")
@@ -18,7 +19,8 @@ func _init() -> void:
 		{"name": "UT-ENEMY", "instance": TestEnemyAI.new()},
 		{"name": "UT-MAGIC", "instance": TestMagicSystem.new()},
 		{"name": "UT-TURN", "instance": TestTurnLifecycle.new()},
-		{"name": "UT-ITEM", "instance": TestInventoryItems.new()}
+		{"name": "UT-ITEM", "instance": TestInventoryItems.new()},
+		{"name": "UT-SCENE", "instance": TestSceneManager.new()}
 	]
 	
 	var total_passed = 0

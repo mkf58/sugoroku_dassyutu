@@ -205,10 +205,10 @@ func _bind_events() -> void:
 	board_view.right_clicked.connect(_on_right_click)
 	
 	game_over_screen.retry_pressed.connect(_on_retry)
-	game_over_screen.title_pressed.connect(_on_retry)
+	game_over_screen.title_pressed.connect(_on_title_return)
 	
 	stage_clear_screen.retry_pressed.connect(_on_retry)
-	stage_clear_screen.title_pressed.connect(_on_retry)
+	stage_clear_screen.title_pressed.connect(_on_title_return)
 
 func _bind_turn_manager_events() -> void:
 	if not tm:
@@ -227,8 +227,11 @@ func _bind_turn_manager_events() -> void:
 		hud.update_turn_info(tm.current_turn, "脱出成功！ステージクリア！")
 		hud.set_action_buttons_enabled(false)
 		hud.log_message("[CLEAR] EXITマスに到達！館からの脱出に成功しました！")
+		if get_node_or_null("/root/SceneManager"):
+			get_node("/root/SceneManager").set_param("has_cleared_stage", true)
 		stage_clear_screen.show_clear(tm.current_turn)
 	)
+
 	
 	tm.water_trap_triggered.connect(func(unit_id, coord):
 		hud.log_message("[TRAP] %s が水魔術トラップ %s に侵入！残歩数破棄・即ターンエンド" % [unit_id, str(coord)])
@@ -616,3 +619,11 @@ func _on_retry() -> void:
 	hud.set_action_buttons_enabled(true)
 	hud.log_message("[Retry] ステージを最初からやり直します。")
 	_init_poc_stage()
+
+func _on_title_return() -> void:
+	DebugLogger.info("MainGame._on_title_return", "タイトル画面へ遷移します")
+	if get_node_or_null("/root/SceneManager"):
+		get_node("/root/SceneManager").change_to_title()
+	else:
+		get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
+

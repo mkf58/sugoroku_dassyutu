@@ -144,3 +144,51 @@ func execute_all_enemies_simultaneous_move(move_plans: Array[Dictionary], on_fin
 - 主人公と魔女の距離が4マス以内、または周回型・感知型の危険視野に入った場合：
   - 画面四隅が赤黒く減光（`ColorRect` のシェーダー透明度をフェードイン）。
   - 低音の心拍SE（ドクン…ドクン…）をループ再生。距離が縮まるほどテンポが上昇。
+
+---
+
+## 5. シーン遷移管理およびタイトル画面詳細設計 (`SceneManager.gd` / `TitleScreen.gd`)
+
+### 5.1 シーンマネージャー仕様 (`res://src/core/scene_manager.gd`)
+プロジェクト全域の画面遷移を一元管理するAutoloadシングルトン。
+
+- **役割と機能：**
+  - シーン切替処理（`change_scene_to_file`）の安全なカプセル化
+  - 画面間のトランジション（最前面CanvasLayerでの黒フェードアウト＆フェードイン：各0.25〜0.35秒）
+  - 二重呼び出し防御（`is_transitioning` フラグによるガード）
+  - ヘッドレスモード（UT実行環境等）での安全なフォールバック（Tweenスキップ・直接切替）
+  - シーン間受け渡しパラメータ（`current_stage_id`, `retry_count`, `save_data`）の保持
+- **定数定義：**
+  - `SCENE_TITLE = "res://scenes/title_screen.tscn"`
+  - `SCENE_MAIN_GAME = "res://scenes/main_game.tscn"`
+  - `SCENE_STAGE_SELECT = "res://scenes/stage_select_screen.tscn"`
+- **公開API：**
+  - `change_scene(target_path: String, params: Dictionary = {}, with_fade: bool = true) -> void`
+  - `change_to_title(with_fade: bool = true) -> void`
+  - `change_to_main_game(stage_id: String = "", with_fade: bool = true) -> void`
+  - `get_param(key: String, default_value = null) -> Variant`
+  - `set_param(key: String, value: Variant) -> void`
+  - `has_save_data() -> bool`
+
+### 5.2 タイトル画面仕様 (`res://scenes/title_screen.tscn` / `res://src/ui/title_screen.gd`)
+- **ノード構成：**
+  ```
+  TitleScreen (Control) [title_screen.gd]
+  ├── Background (ColorRect) - 濃紺・暗色ダークトーン
+  ├── TitlePanel (VBoxContainer)
+  │   ├── TitleLabel (Label) - 『すごろく×魔女の館脱出』
+  │   └── SubtitleLabel (Label) - - Sacrifice & Dice in the Witch's Mansion -
+  ├── MenuContainer (VBoxContainer)
+  │   ├── NewGameButton (Button) - [はじめから]
+  │   ├── ContinueButton (Button) - [つづきから] (セーブ有無で活性/非活性)
+  │   ├── HelpButton (Button) - [遊び方/ヘルプ]
+  │   └── QuitButton (Button) - [ゲーム終了]
+  ├── HelpModal (Control) [HelpModal.tscn] - 遊び方モーダル
+  └── VersionLabel (Label) - v0.1.0 PoC
+  ```
+- **画面アクション：**
+  - `NewGameButton` 押下：`SceneManager.change_to_main_game("STAGE_1")`
+  - `ContinueButton` 押下：セーブデータが存在する場合、該当ステージで `SceneManager.change_to_main_game()`
+  - `HelpButton` 押下：`HelpModal.show_modal()`
+  - `QuitButton` 押下：`get_tree().quit()`
+
