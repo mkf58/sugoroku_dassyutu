@@ -1,9 +1,9 @@
 name: CI & Automated Tests
 
-# 実行トリガー：作業ブランチ（feature/**, fix/**）、dev、mainへのpush、および手動実行
+# 実行トリガー：統合ブランチ（dev, main）へのpush、および手動実行のみ（CI無料枠保護のため作業ブランチでは動かさない）
 on:
   push:
-    branches: [ 'feature/**', 'fix/**', dev, main ]
+    branches: [ dev, main ]
   workflow_dispatch:
 
 jobs:
