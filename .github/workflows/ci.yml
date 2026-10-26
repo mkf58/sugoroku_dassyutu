@@ -1,9 +1,9 @@
 name: CI & Automated Tests
 
-# 実行トリガー：devまたはmainへのpush、および手動実行
+# 実行トリガー：作業ブランチ（feature/**, fix/**）、dev、mainへのpush、および手動実行
 on:
   push:
-    branches: [ dev, main ]
+    branches: [ 'feature/**', 'fix/**', dev, main ]
   workflow_dispatch:
 
 jobs:
