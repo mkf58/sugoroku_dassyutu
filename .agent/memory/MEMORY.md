@@ -43,4 +43,6 @@
    - **GDScript 4のmatch構文と外部Enum定数の罠：** `match variable:` 内で別クラスのEnum定数（`Enums.CellType.*` 等のドット連結定数）をパターンに指定すると、定数として認識されず期待通りにマッチしない。外部Enumの比較には `if / elif` 構文を徹底すること。
    - **GDScript 4のラムダ式変数キャプチャの罠：** ラムダ式は外側のプリミティブ型（`int`, `bool`, `float`, `String`）を「値渡し（コピー）」でキャプチャするため、ラムダ内で値を書き換えても外側の変数は更新されない。シグナル受信用コールバックでは `var res = [false]` や `Dictionary` などの参照型を使用すること。
    - **GDScript 4のインデント規則（タブ・スペース混在厳禁）：** タブ文字と半角スペースが混在しているとパーサーエラー（`Parse Error: Could not resolve class`）を引き起こす。プロジェクト既定のインデント（本プロジェクトは半角スペース4個）に厳密に統一すること。
+8. **Autoloadシングルトンとclass_name重複宣言の罠：**
+   - Godot 4 の Autoload（シングルトン）として登録するスクリプト内で同一の `class_name` を重複宣言すると、グローバルスコープでクラス定義が競合・破損し、「`script does not inherit from 'Node'`」「`Nonexistent function 'new' in base 'GDScript'`」のエラーが発生する。Autoloadスクリプトには `class_name` を付けず `extends Node` のみとする。
 
