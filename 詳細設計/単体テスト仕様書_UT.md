@@ -161,3 +161,16 @@
 | **準正常系** | **UT-SCENE-E02** | `test_invalid_param_key` | 未設定のパラメータキーを `get_param("unknown", "default_val")` で取得 | 指定したデフォルト値 `"default_val"` が安全に返却されること |
 | **境界値** | **UT-SCENE-B01** | `test_empty_params_dictionary` | パラメータに空の辞書 `{}` を渡して遷移 | エラーなく受け付けられ、パラメータがクリア/空辞書となること |
 
+---
+
+### 2.8 UT-STAGE：ステージデータおよび階層遷移定義 (`test_stage_system.gd`)
+
+| 区分 | テスト項目ID | テスト関数名 | 入力・事前条件 | 期待される判定・処理結果 |
+| :--- | :--- | :--- | :--- | :--- |
+| **正常系** | **UT-STAGE-N01** | `test_get_stage_data_returns_valid_stage` | `StageRepository.get_stage("STAGE_1")` 実行 | 有効な `StageData` が返却され、盤面モデル・主人公座標・魔女が設定されていること |
+| **正常系** | **UT-STAGE-N02** | `test_stage_transition_chain` | Stage 1 から `next_stage_id` を走査 | STAGE_1〜6 まで順序正しくチェーンし、最終ステージ（STAGE_6）の `next_stage_id` は空文字であること |
+| **正常系** | **UT-STAGE-N03** | `test_companion_elements_per_stage` | 各ステージの同行者設定を走査 | Stage 1 は同行者0人、Stage 2は炎、Stage 3は水、Stage 4は風、Stage 5は土の少女が設定されていること |
+| **準正常系** | **UT-STAGE-E01** | `test_get_invalid_stage_returns_null` | 未知のステージID（例：`"STAGE_999"`）を指定 | 例外クラッシュせず安全に `null` が返却されること |
+| **境界値** | **UT-STAGE-B01** | `test_all_stage_ids_registered` | `StageRepository.get_all_stage_ids()` 呼び出し | 登録数が 6 件（STAGE_1 〜 STAGE_6）過不足なく返却されること |
+
+

@@ -23,8 +23,8 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 var has_dragged_camera: bool = false
 var pending_additional_steps: int = 0
 var has_pending_additional_move: bool = false
-var has_pending_roll_again: bool = false
 var inventory: Array[Dictionary] = []
+var current_stage_data: StageData = null
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -63,10 +63,22 @@ func _get_enemy_obstacles() -> Array[Vector2i]:
 
 func _ready() -> void:
 	_bind_events()
-	_init_poc_stage()
+	var start_id = "STAGE_1"
+	if get_node_or_null("/root/SceneManager"):
+		start_id = get_node("/root/SceneManager").get_param("stage_id", "STAGE_1")
+	load_stage(start_id, false)
 
 func _init_poc_stage(preserve_inventory: bool = false) -> void:
-	# 既存の盤面表示・ハイライト・経路・コマを完全初期化
+	load_stage("STAGE_1", preserve_inventory)
+
+func load_stage(stage_id: String, preserve_inventory: bool = false) -> void:
+	var stage_data = StageRepository.get_stage(stage_id)
+	if not stage_data:
+		DebugLogger.error("MainGame.load_stage", "ステージデータが見つかりません: %s" % stage_id)
+		stage_data = StageRepository.get_stage("STAGE_1")
+	current_stage_data = stage_data
+
+	# 盤面表示・ハイライト・経路・コマを完全初期化
 	board_view.clear_all()
 	game_over_screen.visible = false
 	stage_clear_screen.visible = false
@@ -88,101 +100,58 @@ func _init_poc_stage(preserve_inventory: bool = false) -> void:
 			"icon_text": "🎲"
 		})
 
-
 	tm = TurnManager.new()
 	_bind_turn_manager_events()
 
-	var board = GridBoard.new()
-	
-	# =========================================================================
-	# 広域回廊型マップ（15x7グリッド、全CellType網羅）
-	# =========================================================================
-	
-	# 1. 中央メインストリート（Y=3, X=1〜14）
-	for x in range(1, 15):
-		var type = Enums.CellType.NORMAL
-		if x == 4:
-			type = Enums.CellType.SKIP_TURN        # 1回休み
-		elif x == 6:
-			type = Enums.CellType.WATER_TRAP       # 水魔術トラップ
-		elif x == 9:
-			type = Enums.CellType.ADDITIONAL_MOVE  # +2マス
-		elif x == 14:
-			type = Enums.CellType.EXIT             # 脱出ゴール
-		board.add_cell(CellData.new(Vector2i(x, 3), type))
-		if x > 1:
-			board.connect_cells(Vector2i(x - 1, 3), Vector2i(x, 3))
+	# 盤面ノードの生成
+	board_view.setup_board(stage_data.board, cell_scene)
 
-	# 2. 北側回廊（Y=1, X=3〜11）
-	for x in range(3, 12):
-		var type = Enums.CellType.NORMAL
-		if x == 3:
-			type = Enums.CellType.ADDITIONAL_MOVE  # +2マス
-		elif x == 5 or x == 11:
-			type = Enums.CellType.EVENT            # 宝箱マス
-		elif x == 7:
-			type = Enums.CellType.ROLL_AGAIN       # もう1回マス
-		elif x == 9:
-			type = Enums.CellType.WATER_TRAP       # 水魔術トラップ
-		board.add_cell(CellData.new(Vector2i(x, 1), type))
-		if x > 3:
-			board.connect_cells(Vector2i(x - 1, 1), Vector2i(x, 1))
+	# 主人公と少女（味方ユニット）の生成
+	var characters: Array[CharacterData] = []
+	var hero = CharacterData.new("HERO", "主人公", stage_data.hero_coord)
+	characters.append(hero)
+	board_view.add_piece(unit_piece_scene, "HERO", "主人公", stage_data.hero_coord, true, false)
 
-	# 3. 南側回廊（Y=5, X=3〜11）
-	for x in range(3, 12):
-		var type = Enums.CellType.NORMAL
-		if x == 3 or x == 11:
-			type = Enums.CellType.EVENT            # 宝箱マス
-		elif x == 5:
-			type = Enums.CellType.RETURN_TO_START  # 振り出しマス
-		elif x == 7:
-			type = Enums.CellType.ADDITIONAL_MOVE  # +2マス
-		elif x == 9:
-			type = Enums.CellType.ROLL_AGAIN       # もう1回マス
-		board.add_cell(CellData.new(Vector2i(x, 5), type))
-		if x > 3:
-			board.connect_cells(Vector2i(x - 1, 5), Vector2i(x, 5))
+	for comp in stage_data.companions:
+		var c_id = comp.get("id", "GIRL")
+		var c_name = comp.get("name", "少女")
+		var c_elem = comp.get("element", Enums.ElementType.NONE)
+		var c_coord = comp.get("coord", Vector2i(1, 2))
+		var girl = CharacterData.new(c_id, c_name, c_coord)
+		girl.available_magics = [c_elem]
+		characters.append(girl)
+		board_view.add_piece(unit_piece_scene, c_id, c_name, c_coord, false, false)
 
-	# 4. 縦の連絡通路（X=3, X=7, X=11）
-	for connect_x in [3, 7, 11]:
-		# 北への連絡マス (connect_x, 2)
-		board.add_cell(CellData.new(Vector2i(connect_x, 2), Enums.CellType.NORMAL))
-		board.connect_cells(Vector2i(connect_x, 1), Vector2i(connect_x, 2))
-		board.connect_cells(Vector2i(connect_x, 2), Vector2i(connect_x, 3))
-		# 南への連絡マス (connect_x, 4)
-		board.add_cell(CellData.new(Vector2i(connect_x, 4), Enums.CellType.NORMAL))
-		board.connect_cells(Vector2i(connect_x, 3), Vector2i(connect_x, 4))
-		board.connect_cells(Vector2i(connect_x, 4), Vector2i(connect_x, 5))
+	# 魔女の生成
+	var enemies: Array[EnemyData] = []
+	for en in stage_data.enemies:
+		var e_id = en.get("id", "WITCH")
+		var e_name = en.get("name", "魔女")
+		var e_type = en.get("type", Enums.EnemyType.TRACKING)
+		var e_coord = en.get("coord", Vector2i(12, 3))
+		var witch = EnemyData.new(e_id, e_type, e_coord)
+		enemies.append(witch)
+		board_view.add_piece(unit_piece_scene, e_id, e_name, e_coord, false, true)
 
-	# 主人公と魔女の生成（主人公: (1,3), 魔女: (12,3) で初期距離11マス！）
-	var hero = CharacterData.new("HERO", "主人公", Vector2i(1, 3))
-	var witch = EnemyData.new("WITCH", Enums.EnemyType.TRACKING, Vector2i(12, 3))
-	
-	board_view.setup_board(board, cell_scene)
-	board_view.add_piece(unit_piece_scene, "HERO", "主人公", Vector2i(1, 3), true, false)
-	board_view.add_piece(unit_piece_scene, "WITCH", "魔女", Vector2i(12, 3), false, true)
-	
-	# カメラ位置を広大マップの中心付近へ合わせる
-	camera.position = Vector2(480, 200)
-	camera.zoom = Vector2(0.95, 0.95)
-	
-	tm.setup_stage(board, [hero], [witch], "WIDE_POC_STAGE")
+	# カメラ設定
+	camera.position = stage_data.initial_camera_pos
+	camera.zoom = stage_data.initial_camera_zoom
+
+	tm.setup_stage(stage_data.board, characters, enemies, stage_data.stage_id)
 	tm.start_player_turn()
 	tm.select_character("HERO")
 
-	
 	current_dice_roll = 0
 	reachable_cells.clear()
 	selected_path.clear()
 	is_moving = false
-	
+
 	hud.update_turn_info(tm.current_turn, "主人公の行動を選択")
 	hud.set_action_buttons_enabled(true)
-	hud.set_action_panel_visible(false) # 新UIへ移行するため旧パネルは非表示
-	hud.log_message("[Stage] 広域脱出ステージ初期化完了。主人公: (1,3), 魔女: (12,3)")
+	hud.set_action_panel_visible(false)
+	hud.log_message("[%s] 開始！" % stage_data.stage_name)
 	hud.log_message("[Turn 1] プレイヤーターン開始。行動コマンドを選択してください。")
 
-	
 	# 行動選択メニューを表示
 	call_deferred("_show_action_command_menu")
 
@@ -231,7 +200,9 @@ func _bind_turn_manager_events() -> void:
 		hud.log_message("[CLEAR] EXITマスに到達！館からの脱出に成功しました！")
 		if get_node_or_null("/root/SceneManager"):
 			get_node("/root/SceneManager").set_param("has_cleared_stage", true)
-		stage_clear_screen.show_clear(tm.current_turn)
+		var has_next = current_stage_data != null and not current_stage_data.next_stage_id.is_empty()
+		var s_name = current_stage_data.stage_name if current_stage_data else ""
+		stage_clear_screen.show_clear(tm.current_turn, s_name, has_next)
 	)
 
 	
@@ -624,8 +595,9 @@ func _on_retry() -> void:
 	action_command_menu.visible = false
 	item_select_modal.visible = false
 	hud.set_action_buttons_enabled(true)
-	hud.log_message("[Retry] ステージを最初からやり直します。")
-	_init_poc_stage(false)
+	hud.log_message("[Retry] このステージを最初からやり直します。")
+	var current_id = current_stage_data.stage_id if current_stage_data else "STAGE_1"
+	load_stage(current_id, false)
 
 func _on_stage_clear_retry() -> void:
 	game_over_screen.visible = false
@@ -633,8 +605,14 @@ func _on_stage_clear_retry() -> void:
 	action_command_menu.visible = false
 	item_select_modal.visible = false
 	hud.set_action_buttons_enabled(true)
-	hud.log_message("[Clear Retry] クリア時のアイテムを保持して再挑戦します。")
-	_init_poc_stage(true)
+	if current_stage_data and not current_stage_data.next_stage_id.is_empty():
+		hud.log_message("[Next Stage] 次の階層へ進みます: %s" % current_stage_data.next_stage_id)
+		if get_node_or_null("/root/SceneManager"):
+			get_node("/root/SceneManager").set_param("stage_id", current_stage_data.next_stage_id)
+		load_stage(current_stage_data.next_stage_id, true)
+	else:
+		hud.log_message("[Clear Finish] 全階層脱出完了！最初からやり直します。")
+		load_stage("STAGE_1", false)
 
 func _on_title_return() -> void:
 
