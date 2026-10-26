@@ -23,6 +23,7 @@ var drag_start_pos: Vector2 = Vector2.ZERO
 var has_dragged_camera: bool = false
 var pending_additional_steps: int = 0
 var has_pending_additional_move: bool = false
+var has_pending_roll_again: bool = false
 var inventory: Array[Dictionary] = []
 var current_stage_data: StageData = null
 

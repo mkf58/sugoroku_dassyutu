@@ -10,6 +10,7 @@ jobs:
   unit-test:
     name: Run Unit Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 3
 
     steps:
       # 1. リポジトリのソースコードを取得

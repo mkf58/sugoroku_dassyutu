@@ -41,3 +41,21 @@ func assert_ne(actual, expected, message: String = "") -> void:
         var msg = "FAIL: %s (Expected NOT %s, got %s)" % [message, str(expected), str(actual)]
         failures.append(msg)
         printerr(msg)
+
+func assert_null(actual, message: String = "") -> void:
+    if actual == null:
+        passed_count += 1
+    else:
+        failed_count += 1
+        var msg = "FAIL: %s (Expected null, got %s)" % [message, str(actual)]
+        failures.append(msg)
+        printerr(msg)
+
+func assert_not_null(actual, message: String = "") -> void:
+    if actual != null:
+        passed_count += 1
+    else:
+        failed_count += 1
+        var msg = "FAIL: %s (Expected NOT null, got null)" % message
+        failures.append(msg)
+        printerr(msg)
