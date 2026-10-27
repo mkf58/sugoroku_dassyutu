@@ -119,7 +119,10 @@ func load_stage(stage_id: String, preserve_inventory: bool = false) -> void:
 		var c_elem = comp.get("element", Enums.ElementType.NONE)
 		var c_coord = comp.get("coord", Vector2i(1, 2))
 		var girl = CharacterData.new(c_id, c_name, c_coord)
-		girl.available_magics = [c_elem]
+		var magics: Array[Enums.ElementType] = []
+		if c_elem != Enums.ElementType.NONE:
+			magics.append(c_elem as Enums.ElementType)
+		girl.available_magics = magics
 		characters.append(girl)
 		board_view.add_piece(unit_piece_scene, c_id, c_name, c_coord, false, false)
 
