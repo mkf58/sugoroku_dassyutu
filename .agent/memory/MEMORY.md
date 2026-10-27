@@ -47,4 +47,11 @@
    - **GDScript 4のインデント規則（タブ・スペース混在厳禁）：** タブ文字と半角スペースが混在しているとパーサーエラー（`Parse Error: Could not resolve class`）を引き起こす。プロジェクト既定のインデント（本プロジェクトは半角スペース4個）に厳密に統一すること。
 8. **Autoloadシングルトンとclass_name重複宣言の罠：**
    - Godot 4 の Autoload（シングルトン）として登録するスクリプト内で同一の `class_name` を重複宣言すると、グローバルスコープでクラス定義が競合・破損し、「`script does not inherit from 'Node'`」「`Nonexistent function 'new' in base 'GDScript'`」のエラーが発生する。Autoloadスクリプトには `class_name` を付けず `extends Node` のみとする。
+9. **型指定配列（Array[Type]）とUntyped Array代入の罠（GDScript 4）：**
+   - GDScript 4 では、`Array[Enums.ElementType]` 等の型指定プロパティに Untyped Array（`[c_elem]`）を直接代入すると `Invalid assignment of property ... with value of type 'Array'` でクラッシュする。必ず `var arr: Array[Type] = []` を明示構築して代入すること。
+10. **動的エンティティIDとハードコード参照の排除：**
+    - ステージごとに生成されるID（`WITCH_1` 等）を Dictionary から取得する際、旧PoCの固定キー（`"WITCH"`）をハードコードすると即死する。`tm.enemies.values()` を動的に巡回するキュー構造とし、エネミー不在時（0体）も安全にスキップされる設計を徹底する。
+11. **開発プロセスとテスト戦略（実機検証優先）：**
+    - UTが厚い段階では、コード流動期に結合テストを先行させると手戻りが大きくなる。手動プレイによる手触り検証・機能肉付けを先行させ、仕様安定後に結合テストを固めるのが最も開発効率が良い。
+
 

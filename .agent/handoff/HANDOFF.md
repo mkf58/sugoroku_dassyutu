@@ -1,40 +1,36 @@
 # HANDOFF
 
 ## 作業日時
-2026-10-26 22:10
+2026-10-27 21:58
 
 ## 現在のステータス
-- **フェーズ：** フロア遷移システム実装＆ローカル自動テスト体制確立完了（全178テスト 100% Pass）
-- **作業ブランチ：** `fix/mandate-local-testing-only`（`dev` へマージ済み）
+- **フェーズ：** フロア遷移（Stage 1 → Stage 2）動作確認完了・仲間キャラ（少女）操作実装へ移行
+- **作業ブランチ：** `dev`（リモート同期完了）
 - **開発統合ブランチ：** `dev`（リモート同期完了）
-- **自動テスト結果：** ローカル環境（`run_tests.ps1`）にて **全8スイート TOTAL PASSED: 178 / TOTAL FAILED: 0**（実行時間1秒）
+- **自動テスト結果：** ローカル環境（`run_tests.ps1`）にて **全8スイート TOTAL PASSED: 178 / TOTAL FAILED: 0**
 
 ## 本日の実施内容サマリー
-1. **不具合4点の改修：**
-   - タイトル画面からヘルプモーダルが開けない不具合の解消（`show_modal()` エイリアス実装）。
-   - クリア画面「もう一回」時のアイテム引き継ぎ（`_init_poc_stage(preserve_inventory)`）。
-   - 振り出しマス停止時のプレイヤーコマ位置復帰（Tween破棄と論理座標強制同期）。
-   - EXITマスへの出目余り到達（ぴったりでなくてもゴール可能化）。
-2. **フロア遷移システム（StageData & StageRepository & 動的ロード）の実装：**
-   - [実装コード/src/core/stage_data.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/core/stage_data.gd) / [実装コード/src/core/stage_repository.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/core/stage_repository.gd) を作成し、Stage 1〜Stage 6の階層チェーンを構築。
-   - [実装コード/src/main_game.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/main_game.gd) で `load_stage()` による動的初期化へ移行。
-   - [実装コード/src/ui/stage_clear_screen.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/src/ui/stage_clear_screen.gd) に「次の階層へ進む」ボタン遷移を追加。
-   - 単体テスト UT-STAGE（[test_stage_system.gd](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/実装コード/tests/test_stage_system.gd)）を追加。
-3. **ローカル自動テスト必須化とCI無料枠保護：**
-   - [run_tests.ps1](file:///c:/Users/mkf11/antigravity_base/sugoroku_dassyutu/run_tests.ps1) を作成し、ローカルで瞬時にテストできる環境を整備。
-   - `ci.yml` から作業ブランチトリガーを排除し、GitHub Actions無料枠の浪費・課金リスクをゼロに保護。
-   - `AGENTS.md` に「devマージ前ローカル自動テスト必須（全件パス確認）」を厳格にルール化。
+1. **開発タスク優先度の見直し：**
+   - 結合テストの実施タイミングを「コード・ステージがあらかた組み上がり、設計書をFIXさせた後」へと見直し、実機手動プレイでの手触り検証と機能肉付けを最優先タスクに整理。
+2. **Stage 1 における魔女ターン移行時クラッシュの改修：**
+   - 魔女IDのハードコード（`"WITCH"`）を排除し、`tm.enemies` の動的巡回処理（`_process_enemy_actions`）へリファクタリング。ステージ固有ID（`WITCH_1`等）および魔女不在・複数魔女時にも安全に対応。
+3. **Stage 2 遷移時の少女生成クラッシュの改修：**
+   - `CharacterData.available_magics`（`Array[Enums.ElementType]`）に対する Untyped Array 代入型エラーを修正し、Stage 2 への正常遷移・所持アイテム引き継ぎが実機で動作することを確認。
+4. **プロジェクト運用ルールの更新（AGENTS.md）：**
+   - 「既存の単体テストコード修正時は、必ず修正前にユーザーへ報告する（新規追加時は不要）」ルールを明記。
 
 ## 次回の作業（最優先事項）
-**【最重要】今回実装した各機能の動作確認（手動プレイ・デバッグ確認）：**
-1. **ゲーム起動（タイトル画面）：**
-   - Godot エディタから実行（または `F5`）し、タイトル画面（TitleScreen）が表示されること。
-   - 「ヘルプ」ボタンを押してヘルプモーダルが正しく開閉できること。
-2. **Stage 1（チュートリアル階）のプレイ＆EXITマス確認：**
-   - 「初めから」で Stage 1（地下監獄）がロードされること。
-   - EXITマスが出目ピッタリでなくても（出目が余っていても）選択肢に表示され、ゴールできること。
-   - 振り出し（戻る）マスに止まった際、コマが視覚的にも正しくスタートマスへ戻ること。
-3. **フロア遷移（Stage 1 → Stage 2 → ...）：**
-   - Stage 1 クリア画面で「次の階層へ進む」を押し、所持アイテムを引き継いだまま Stage 2（炎の少女同行階）へ遷移すること。
-   - Stage 2 で炎の魔法（2マス以内の魔女撃破）が使用可能なこと。
-   - 各階層のEXITから次の階層へスムーズに進めること。
+**【最重要】仲間キャラ（魔法使いの少女）の操作システムの実装：**
+- **現状の課題：**
+  - 現在の実装では、味方ターン開始時に主人公（`HERO`）のみが行動選択され、移動後にそのまま魔女のターンへ進んでしまうため、同行している少女（Stage 2: 炎の少女 `GIRL_FIRE`）を動かすことができない。
+- **実装すべき内容：**
+  1. **味方ターンの複数ユニット行動制御：**
+     - 主人公の行動完了後、未行動の仲間キャラ（少女）がいる場合はその少女のコマンドメニュー（またはユニット選択）を展開する。
+     - 全ての味方ユニットが行動終了した段階で、初めて魔女のターン（`_advance_to_enemy_turn`）へ移行する。
+  2. **少女の固有アクション・魔法行使の連携：**
+     - コマンドメニュー（`ActionCommandMenu`）に少女の名前・状態・固有魔法（例：炎の少女なら「炎魔術：2マス以内の魔女を撃破」）を正しくセットアップする。
+     - 魔法ボタン押下時に `tm.execute_magic("GIRL_FIRE", Enums.ElementType.FIRE, ...)` を呼び出して魔女を撃破する。
+     - 少女のダイス移動・待機・祈るが正常に機能すること。
+- **遵守ルール：**
+  - 既存の単体テストコードを修正する場合は、必ず修正前にユーザーへ報告すること。
+  - 実装・修正時は必ず新規作業ブランチ（`feature/companion-unit-action` 等）を切り、`dev` マージ前にローカル自動テスト（`run_tests.ps1`）で 100% 合格を確認すること。
