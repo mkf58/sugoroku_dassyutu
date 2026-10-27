@@ -2359,6 +2359,35 @@ stateDiagram-v2
 「1をマップデータ自体は仮置きして作ります．中身のマップの構造とかイベントとかは後回しにして，先にシステム部分を完成させる方針．
 その後，すべての遷移をやりましょう」
 
+---
+
+### Q84. [Agent] 1面（魔法使い不在時）のクラッシュエラー詳細・発生操作の確認
+ユーザー様より「1面で魔法使いが居ないため落ちている。いないパターンも存在するのでそのように修正してほしい」とのご報告をいただきました。
+確実に原因を解消するため、以下の点について確認させてください。
+
+1. **エラーが発生したタイミング・操作：**
+   - (A) ゲーム開始（「初めから」押下直後、ステージロード時）
+   - (B) ダイスを振って移動完了後（魔女の思考・行動へ移行する瞬間）
+   - (C) コマンドメニューの「魔法」ボタン等を押した時
+   - (D) その他（どの操作の瞬間に落ちたか）
+2. **Godotデバッガ（OutputまたはDebuggerタブ）に表示されたエラーメッセージ：**
+   - 例: `Invalid get index ... (on base: 'Dictionary')`、`Nonexistent function ...`、または発生箇所のスクリプト名と行番号（`main_game.gd:509` など）
+
+**A84. [User]**
+```gdscript
+hud.set_action_buttons_enabled(false)
+hud.update_turn_info(tm.current_turn, "魔女の行動中...")
+hud.log_message("[Enemy] 魔女のターン開始。思考中...")
+
+var witch = tm.enemies["WITCH"]
+var target = tm.select_witch_target(witch)
+var witch_piece = board_view.get_piece("WITCH")
+```
+「これの宣言のところで落ちってるっぽい？よく見ると魔女ですね...」
+→ 原因特定：旧PoCの固定ID `"WITCH"` がハードコードされており、Stage 1 の定義 ID `"WITCH_1"` と不一致を起こしていたこと、および複数魔女・魔女0体に対応していないことが原因。
+
+
+
 
 
 

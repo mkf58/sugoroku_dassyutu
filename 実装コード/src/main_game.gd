@@ -506,25 +506,44 @@ func _advance_to_enemy_turn() -> void:
 	hud.update_turn_info(tm.current_turn, "魔女の行動中...")
 	hud.log_message("[Enemy] 魔女のターン開始。思考中...")
 	
-	var witch = tm.enemies["WITCH"]
+	var alive_enemies: Array[EnemyData] = []
+	for e in tm.enemies.values():
+		if e.is_alive and e.stun_turns <= 0:
+			alive_enemies.append(e)
+			
+	if alive_enemies.is_empty():
+		hud.log_message("[Enemy] 行動可能な魔女が存在しないため、魔女ターンを終了します。")
+		_on_enemy_turn_finished()
+		return
+		
+	_process_enemy_actions(alive_enemies, 0)
+
+func _process_enemy_actions(enemy_list: Array[EnemyData], index: int) -> void:
+	if tm.current_phase == Enums.TurnPhase.GAME_OVER:
+		return
+	if index >= enemy_list.size():
+		_on_enemy_turn_finished()
+		return
+		
+	var witch = enemy_list[index]
+	var witch_piece = board_view.get_piece(witch.enemy_id)
 	var target = tm.select_witch_target(witch)
-	var witch_piece = board_view.get_piece("WITCH")
 	
-	if target:
+	if target and witch_piece:
 		witch_piece.set_target_name(target.name)
 		var target_coord = target.current_coord
 		var path = tm.board.find_shortest_path(witch.current_coord, target_coord)
 		var dist = path.size() - 1 if not path.is_empty() else 99
-		hud.log_message("[Enemy] ターゲット: %s (距離: %dマス)" % [target.name, dist])
+		hud.log_message("[Enemy] %s ターゲット: %s (距離: %dマス)" % [witch.enemy_id, target.name, dist])
 		
-		# 魔女は2マス移動（PoC固定歩数）
+		# 魔女は2マス移動（固定歩数）
 		var witch_steps = 2
 		var actual_path: Array[Vector2i] = []
 		for i in range(min(path.size(), witch_steps + 1)):
 			actual_path.append(path[i])
 			
 		if actual_path.size() > 1:
-			hud.log_message("[Enemy] 魔女が %s から %s へ移動開始" % [str(witch.current_coord), str(actual_path[-1])])
+			hud.log_message("[Enemy] %s が %s から %s へ移動開始" % [witch.enemy_id, str(witch.current_coord), str(actual_path[-1])])
 			witch_piece.animate_path(
 				actual_path,
 				func(to_c: Vector2i, _rem: int):
@@ -532,28 +551,37 @@ func _advance_to_enemy_turn() -> void:
 					# 1. 水魔術トラップ判定
 					var cell = tm.board.get_cell(to_c)
 					if cell and cell.cell_type == Enums.CellType.WATER_TRAP:
-						hud.log_message("[TRAP] 魔女が水魔術トラップ %s に捕まり、移動が停止した！" % str(to_c))
-						DebugLogger.info("MainGame._advance_to_enemy_turn", "魔女が水魔術トラップで移動停止", {"coord": to_c})
+						hud.log_message("[TRAP] %s が水魔術トラップ %s に捕まり、移動が停止した！" % [witch.enemy_id, str(to_c)])
+						DebugLogger.info("MainGame._process_enemy_actions", "魔女が水魔術トラップで移動停止", {"coord": to_c})
 						return {"result": "WATER_TRAP_STOP"}
-					# 2. 主人公との接触判定
-					var hero = tm.characters["HERO"]
-					if hero.is_alive and hero.current_coord == to_c:
-						if not hero.is_burrowed:
-							tm.current_phase = Enums.TurnPhase.GAME_OVER
-							tm.emit_signal("game_over_triggered", "魔女に背後から追いつかれた")
-							return {"result": "GAME_OVER"}
+					# 2. 味方ユニットとの接触判定
+					for c in tm.characters.values():
+						if c.is_alive and c.current_coord == to_c:
+							if not c.is_burrowed:
+								if c.character_id == "HERO":
+									tm.current_phase = Enums.TurnPhase.GAME_OVER
+									tm.emit_signal("game_over_triggered", "魔女に背後から追いつかれた")
+									return {"result": "GAME_OVER"}
+								else:
+									c.kill()
+									tm.emit_signal("unit_killed", c.character_id)
+									hud.log_message("[Kill] %s が魔女に捕まり倒された！" % c.name)
+									var cp = board_view.get_piece(c.character_id)
+									if cp:
+										cp.visible = false
+									return {"result": "GIRL_DIED"}
 					return {"result": "CONTINUE"},
 				func():
-					_on_enemy_turn_finished()
-
+					_process_enemy_actions(enemy_list, index + 1)
 			)
 		else:
-			hud.log_message("[Enemy] 魔女は移動先がありませんでした。")
-			_on_enemy_turn_finished()
+			hud.log_message("[Enemy] %s は移動先がありませんでした。" % witch.enemy_id)
+			_process_enemy_actions(enemy_list, index + 1)
 	else:
-		witch_piece.set_target_name("")
-		hud.log_message("[Enemy] 未潜行の対象が存在しないため、魔女は索敵できませんでした。")
-		_on_enemy_turn_finished()
+		if witch_piece:
+			witch_piece.set_target_name("")
+		hud.log_message("[Enemy] 対象が存在しないか、索敵できませんでした。")
+		_process_enemy_actions(enemy_list, index + 1)
 
 func _on_enemy_turn_finished() -> void:
 	if tm.current_phase == Enums.TurnPhase.GAME_OVER:
@@ -586,7 +614,13 @@ func _on_enemy_turn_finished() -> void:
 	hud.update_turn_info(tm.current_turn, "主人公の行動を選択 [右クリック: 盤面確認]")
 	hud.set_action_buttons_enabled(true)
 	hud.set_action_panel_visible(false)
-	hud.log_message("[Turn %d] プレイヤーターン開始！主人公: %s, 魔女: %s" % [tm.current_turn, str(hero.current_coord), str(tm.enemies["WITCH"].current_coord)])
+	var witch_info = ""
+	for e in tm.enemies.values():
+		if e.is_alive:
+			witch_info += "%s:%s " % [e.enemy_id, str(e.current_coord)]
+	if witch_info.is_empty():
+		witch_info = "なし"
+	hud.log_message("[Turn %d] プレイヤーターン開始！主人公: %s, 魔女: %s" % [tm.current_turn, str(hero.current_coord), witch_info])
 	_show_action_command_menu()
 
 
