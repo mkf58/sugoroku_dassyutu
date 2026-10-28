@@ -118,7 +118,11 @@ func load_stage(stage_id: String, preserve_inventory: bool = false) -> void:
 		var c_id = comp.get("id", "GIRL")
 		var c_name = comp.get("name", "少女")
 		var c_elem = comp.get("element", Enums.ElementType.NONE)
-		var c_coord = comp.get("coord", Vector2i(1, 2))
+		var c_coord = comp.get("coord", Vector2i(2, 3))
+		# 防御的チェック：盤面にマスが存在しない座標なら主人公座標へフォールバック
+		if stage_data.board and not stage_data.board.has_cell(c_coord):
+			DebugLogger.error("MainGame.load_stage", "少女の初期座標にマスが存在しません。補正します", {"coord": c_coord, "fallback": stage_data.hero_coord})
+			c_coord = stage_data.hero_coord
 		var girl = CharacterData.new(c_id, c_name, c_coord)
 		var magics: Array[Enums.ElementType] = []
 		if c_elem != Enums.ElementType.NONE:
@@ -134,6 +138,8 @@ func load_stage(stage_id: String, preserve_inventory: bool = false) -> void:
 		var e_name = en.get("name", "魔女")
 		var e_type = en.get("type", Enums.EnemyType.TRACKING)
 		var e_coord = en.get("coord", Vector2i(12, 3))
+		if stage_data.board and not stage_data.board.has_cell(e_coord):
+			DebugLogger.error("MainGame.load_stage", "魔女の初期座標にマスが存在しません。補正します", {"coord": e_coord})
 		var witch = EnemyData.new(e_id, e_type, e_coord)
 		enemies.append(witch)
 		board_view.add_piece(unit_piece_scene, e_id, e_name, e_coord, false, true)

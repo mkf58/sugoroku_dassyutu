@@ -10,6 +10,7 @@ func run_all() -> void:
     test_companion_elements_per_stage()
     test_get_invalid_stage_returns_null()
     test_all_stage_ids_registered()
+    test_all_units_placed_on_valid_cells()
 
 ## UT-STAGE-N01: Stage 1のデータ取得と基本プロパティ検証
 func test_get_stage_data_returns_valid_stage() -> void:
@@ -71,3 +72,20 @@ func test_all_stage_ids_registered() -> void:
     var ids = StageRepositoryClass.get_all_stage_ids()
     assert_eq(ids.size(), 6, "UT-STAGE-B01: 全6ステージのIDが登録されていること")
     assert_true(ids.has("STAGE_1") and ids.has("STAGE_6"), "UT-STAGE-B01: 境界ステージが含まれること")
+
+## UT-STAGE-N04: 全ステージの初期配置ユニット（主人公・少女・魔女）が盤面マス上に存在すること
+func test_all_units_placed_on_valid_cells() -> void:
+    for stage_id in StageRepositoryClass.get_all_stage_ids():
+        var stage = StageRepositoryClass.get_stage(stage_id)
+        assert_not_null(stage, "UT-STAGE-N04: ステージが存在すること")
+        # 主人公
+        assert_true(stage.board.has_cell(stage.hero_coord), "UT-STAGE-N04: [%s] 主人公の初期位置 %s が盤面上に存在すること" % [stage_id, str(stage.hero_coord)])
+        # 同行仲間（少女）
+        for comp in stage.companions:
+            var c_coord = comp.get("coord", Vector2i.ZERO)
+            assert_true(stage.board.has_cell(c_coord), "UT-STAGE-N04: [%s] 少女 %s の初期位置 %s が盤面上に存在すること" % [stage_id, comp.get("name", ""), str(c_coord)])
+        # 魔女
+        for enemy in stage.enemies:
+            var e_coord = enemy.get("coord", Vector2i.ZERO)
+            assert_true(stage.board.has_cell(e_coord), "UT-STAGE-N04: [%s] 魔女 %s の初期位置 %s が盤面上に存在すること" % [stage_id, enemy.get("id", ""), str(e_coord)])
+
