@@ -419,7 +419,8 @@ func _on_item_used(item_id: String) -> void:
 	
 	var unit = tm.characters[current_acting_unit_id]
 	var obstacles = _get_enemy_obstacles()
-	reachable_cells = tm.board.get_reachable_cells_with_steps(unit.current_coord, current_dice_roll, obstacles)
+	var raw_reachables = tm.board.get_reachable_cells_with_steps(unit.current_coord, current_dice_roll, obstacles)
+	reachable_cells = _filter_reachable_cells(raw_reachables)
 	board_view.clear_highlights()
 	for c in reachable_cells.keys():
 		board_view.set_cell_highlight(c, true, Color(0.3, 0.8, 1.0, 0.8))
@@ -443,6 +444,14 @@ func _handle_cell_event(cell_data: CellData) -> void:
 	hud.log_message("[Chest] 宝箱を開けた！【%dの賽】を手に入れた！(所持: %d個)" % [random_val, inventory.size()])
 	DebugLogger.info("MainGame._handle_cell_event", "宝箱マスでアイテム入手: " + item_data.name)
 
+## 他の生存味方ユニットが存在するマスを最終停止候補から除外（同じマスに重複停止不可）
+func _filter_reachable_cells(reachables: Dictionary) -> Dictionary:
+	var filtered = reachables.duplicate()
+	for c in tm.characters.values():
+		if c.character_id != current_acting_unit_id and c.is_alive:
+			filtered.erase(c.current_coord)
+	return filtered
+
 func _on_roll_dice() -> void:
 	if is_moving:
 		DebugLogger.warn("MainGame._on_roll_dice", "コマ移動中のためダイスを振れません")
@@ -457,7 +466,8 @@ func _on_roll_dice() -> void:
 	
 	var unit = tm.characters[current_acting_unit_id]
 	var obstacles = _get_enemy_obstacles()
-	reachable_cells = tm.board.get_reachable_cells_with_steps(unit.current_coord, current_dice_roll, obstacles)
+	var raw_reachables = tm.board.get_reachable_cells_with_steps(unit.current_coord, current_dice_roll, obstacles)
+	reachable_cells = _filter_reachable_cells(raw_reachables)
 	board_view.clear_highlights()
 	for c in reachable_cells.keys():
 		board_view.set_cell_highlight(c, true, Color(0.3, 0.8, 1.0, 0.8))
@@ -669,7 +679,8 @@ func _trigger_additional_move(steps: int) -> void:
 	hud.show_dice_result(current_dice_roll)
 	var unit = tm.characters[current_acting_unit_id]
 	var obstacles = _get_enemy_obstacles()
-	reachable_cells = tm.board.get_reachable_cells_with_steps(unit.current_coord, current_dice_roll, obstacles)
+	var raw_reachables = tm.board.get_reachable_cells_with_steps(unit.current_coord, current_dice_roll, obstacles)
+	reachable_cells = _filter_reachable_cells(raw_reachables)
 	board_view.clear_highlights()
 	for c in reachable_cells.keys():
 		board_view.set_cell_highlight(c, true, Color(0.3, 0.8, 1.0, 0.8))
