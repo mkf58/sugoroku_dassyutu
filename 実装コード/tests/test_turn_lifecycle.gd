@@ -10,6 +10,8 @@ func run_all() -> void:
 	test_select_character_fails_when_skipped()
 	test_select_character_fails_not_found()
 	test_revive_exact_turn_boundary()
+	test_multiple_allies_sequential_action()
+	test_girl_death_during_step_movement()
 
 ## UT-TURN-N01: ターン進行と行動リセット
 func test_turn_advance_and_reselection() -> void:
@@ -123,3 +125,49 @@ func test_revive_exact_turn_boundary() -> void:
 	assert_false(girl.is_alive, "UT-TURN-B01: カウント1でも依然死亡")
 	girl.tick_revive() # 1 -> 0
 	assert_true(girl.is_alive, "UT-TURN-B01: カウント0で即座に復活")
+
+## UT-TURN-N04: 複数味方ユニットの順次行動制御
+func test_multiple_allies_sequential_action() -> void:
+	var tm = TurnManager.new()
+	var board = GridBoard.new()
+	board.add_cell(CellData.new(Vector2i(0, 0), Enums.CellType.NORMAL))
+	board.add_cell(CellData.new(Vector2i(1, 0), Enums.CellType.NORMAL))
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(0, 0))
+	var girl = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(1, 0))
+	tm.setup_stage(board, [hero, girl], [], "STAGE_TEST")
+
+	# 主人公の選択・行動
+	assert_true(tm.select_character("HERO"), "UT-TURN-N04: 最初は主人公が選択可能")
+	hero.has_acted = true
+	assert_false(tm.select_character("HERO"), "UT-TURN-N04: 主人公は行動後選択不可")
+
+	# 少女の選択・行動
+	assert_true(tm.select_character("GIRL_FIRE"), "UT-TURN-N04: 主人公行動後、少女が選択可能")
+	girl.has_acted = true
+	assert_false(tm.select_character("GIRL_FIRE"), "UT-TURN-N04: 少女も行動後選択不可")
+
+	# ターン終了と次ターンのリセット
+	tm.end_turn_and_advance()
+	assert_false(hero.has_acted, "UT-TURN-N04: ターン経過で主人公行動リセット")
+	assert_false(girl.has_acted, "UT-TURN-N04: ターン経過で少女行動リセット")
+	assert_true(tm.select_character("HERO"), "UT-TURN-N04: 次ターンで再び主人公選択可能")
+
+## UT-TURN-N05: 少女が魔女マスへ侵入した際の殺害判定（ゲームオーバーにならず少女のみ死亡）
+func test_girl_death_during_step_movement() -> void:
+	var tm = TurnManager.new()
+	var board = GridBoard.new()
+	board.add_cell(CellData.new(Vector2i(0, 0), Enums.CellType.NORMAL))
+	board.add_cell(CellData.new(Vector2i(1, 0), Enums.CellType.NORMAL))
+	board.connect_cells(Vector2i(0, 0), Vector2i(1, 0))
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(0, 0))
+	var girl = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(0, 0))
+	var witch = EnemyData.new("WITCH", Enums.EnemyType.TRACKING, Vector2i(1, 0))
+	tm.setup_stage(board, [hero, girl], [witch], "STAGE_TEST")
+
+	var step_res = tm.step_unit(girl, Vector2i(1, 0), 0)
+	assert_eq(step_res.get("result"), "GIRL_DIED", "UT-TURN-N05: 少女が魔女マスに到達するとGIRL_DIEDを返す")
+	assert_false(girl.is_alive, "UT-TURN-N05: 少女の生存フラグがfalseになる")
+	assert_eq(girl.revive_turn_count, 3, "UT-TURN-N05: 復活カウントが3にセットされる")
+	assert_true(hero.is_alive, "UT-TURN-N05: 主人公は生存のまま")
+	assert_ne(tm.current_phase, Enums.TurnPhase.GAME_OVER, "UT-TURN-N05: 少女死亡時はゲームオーバーにならない")
+
