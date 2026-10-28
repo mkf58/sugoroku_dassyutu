@@ -121,7 +121,7 @@ static func _create_stage_2() -> StageData:
         {"id": "WITCH_2", "name": "追跡する魔女", "type": Enums.EnemyType.TRACKING, "coord": Vector2i(12, 3)}
     ]
     var companions: Array[Dictionary] = [
-        {"id": "GIRL_FIRE", "name": "炎の少女", "element": Enums.ElementType.FIRE, "coord": Vector2i(1, 1)}
+        {"id": "GIRL_FIRE", "name": "炎の少女", "element": Enums.ElementType.FIRE, "coord": Vector2i(2, 3)}
     ]
     return StageData.new(
         "STAGE_2",
@@ -141,7 +141,7 @@ static func _create_stage_3() -> StageData:
         {"id": "WITCH_3", "name": "中庭の魔女", "type": Enums.EnemyType.TRACKING, "coord": Vector2i(12, 3)}
     ]
     var companions: Array[Dictionary] = [
-        {"id": "GIRL_WATER", "name": "水の少女", "element": Enums.ElementType.WATER, "coord": Vector2i(1, 1)}
+        {"id": "GIRL_WATER", "name": "水の少女", "element": Enums.ElementType.WATER, "coord": Vector2i(2, 3)}
     ]
     return StageData.new(
         "STAGE_3",
@@ -161,7 +161,7 @@ static func _create_stage_4() -> StageData:
         {"id": "WITCH_4", "name": "時計塔の魔女", "type": Enums.EnemyType.TRACKING, "coord": Vector2i(12, 3)}
     ]
     var companions: Array[Dictionary] = [
-        {"id": "GIRL_WIND", "name": "風の少女", "element": Enums.ElementType.WIND, "coord": Vector2i(1, 1)}
+        {"id": "GIRL_WIND", "name": "風の少女", "element": Enums.ElementType.WIND, "coord": Vector2i(2, 3)}
     ]
     return StageData.new(
         "STAGE_4",
@@ -181,7 +181,7 @@ static func _create_stage_5() -> StageData:
         {"id": "WITCH_5", "name": "地下墓所の魔女", "type": Enums.EnemyType.TRACKING, "coord": Vector2i(12, 3)}
     ]
     var companions: Array[Dictionary] = [
-        {"id": "GIRL_EARTH", "name": "土の少女", "element": Enums.ElementType.EARTH, "coord": Vector2i(1, 1)}
+        {"id": "GIRL_EARTH", "name": "土の少女", "element": Enums.ElementType.EARTH, "coord": Vector2i(2, 3)}
     ]
     return StageData.new(
         "STAGE_5",

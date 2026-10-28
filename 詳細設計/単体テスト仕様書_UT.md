@@ -173,5 +173,6 @@
 | **正常系** | **UT-STAGE-N03** | `test_companion_elements_per_stage` | 各ステージの同行者設定を走査 | Stage 1 は同行者0人、Stage 2は炎、Stage 3は水、Stage 4は風、Stage 5は土の少女が設定されていること |
 | **準正常系** | **UT-STAGE-E01** | `test_get_invalid_stage_returns_null` | 未知のステージID（例：`"STAGE_999"`）を指定 | 例外クラッシュせず安全に `null` が返却されること |
 | **境界値** | **UT-STAGE-B01** | `test_all_stage_ids_registered` | `StageRepository.get_all_stage_ids()` 呼び出し | 登録数が 6 件（STAGE_1 〜 STAGE_6）過不足なく返却されること |
+| **正常系** | **UT-STAGE-N04** | `test_all_units_placed_on_valid_cells` | 全6ステージの主人公・少女・魔女の初期配置座標を検証 | 全ユニットの初期座標が盤面上（`board.has_cell == true`）に存在すること |
 
 
