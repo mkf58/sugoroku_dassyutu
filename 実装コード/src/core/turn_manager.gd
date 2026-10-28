@@ -107,8 +107,10 @@ func step_unit(unit: CharacterData, to_coord: Vector2i, remaining_steps: int) ->
     if remaining_steps > 0:
         return {"result": "CONTINUE", "coord": to_coord}
     else:
-        # 到着（残り歩数0）
+        # 到着（残り歩数0）：地上に出現し潜行解除
         unit.has_acted = true
+        if unit.is_burrowed:
+            unit.is_burrowed = false
         if cell:
             resolve_stop_cell(unit, cell)
         return {"result": "ARRIVED", "coord": to_coord}

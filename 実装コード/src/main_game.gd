@@ -344,9 +344,14 @@ func _show_action_command_menu(custom_mouse_pos: Vector2 = Vector2.ZERO) -> void
 	var can_magic = false
 	
 	if current_acting_unit_id == "HERO":
-		magic_name = "土魔術"
-		magic_desc = "地中に潜行して魔女をやり過ごす（移動不可）"
-		can_magic = not unit.is_burrowed
+		if unit.available_magics.has(Enums.ElementType.EARTH):
+			magic_name = "土魔術"
+			magic_desc = "地中に潜行して魔女をやり過ごす"
+			can_magic = not unit.is_burrowed
+		else:
+			magic_name = "魔法なし"
+			magic_desc = "使用可能な魔法がありません"
+			can_magic = false
 	elif unit.available_magics.has(Enums.ElementType.FIRE):
 		magic_name = "炎魔術"
 		var nearby_witches = _find_alive_enemies_in_range(unit.current_coord, 2)
@@ -499,18 +504,9 @@ func _on_magic_pressed() -> void:
 	if not unit:
 		return
 		
-	if current_acting_unit_id == "HERO":
-		unit.is_burrowed = true
-		var piece = board_view.get_piece("HERO")
-		if piece:
-			piece.set_burrowed(true)
-		unit.has_acted = true
-		hud.update_turn_info(tm.current_turn, "主人公は土魔術で地中に潜行した！")
-		hud.log_message("[Magic] 主人公が土魔術を発動！地中に潜行しました（魔女をやり過ごせます）。")
-		DebugLogger.info("MainGame._on_magic_pressed", "土魔術発動！地中に潜行（魔女やり過ごし有効）")
-		_on_unit_action_finished(current_acting_unit_id)
-		
-	elif unit.available_magics.has(Enums.ElementType.FIRE):
+	var piece = board_view.get_piece(current_acting_unit_id)
+
+	if unit.available_magics.has(Enums.ElementType.FIRE):
 		var nearby_witches = _find_alive_enemies_in_range(unit.current_coord, 2)
 		if nearby_witches.is_empty():
 			DebugLogger.warn("MainGame._on_magic_pressed", "2マス以内に魔女が存在しません")
@@ -519,6 +515,8 @@ func _on_magic_pressed() -> void:
 		var target_witch = nearby_witches[0]
 		var ok = tm.execute_magic(current_acting_unit_id, Enums.ElementType.FIRE, target_witch.current_coord)
 		if ok:
+			if piece:
+				piece.set_burrowed(false)
 			var wp = board_view.get_piece(target_witch.enemy_id)
 			if wp:
 				wp.visible = false
@@ -529,6 +527,8 @@ func _on_magic_pressed() -> void:
 	elif unit.available_magics.has(Enums.ElementType.WATER):
 		var ok = tm.execute_magic(current_acting_unit_id, Enums.ElementType.WATER, unit.current_coord)
 		if ok:
+			if piece:
+				piece.set_burrowed(false)
 			hud.log_message("[Magic] 【水魔術】発動！座標 %s を水トラップマスに変化させました。" % str(unit.current_coord))
 			var cell_node = board_view.cell_nodes.get(unit.current_coord, null)
 			if cell_node:
@@ -537,11 +537,18 @@ func _on_magic_pressed() -> void:
 		
 	elif unit.available_magics.has(Enums.ElementType.EARTH):
 		unit.is_burrowed = true
-		var piece = board_view.get_piece(current_acting_unit_id)
 		if piece:
 			piece.set_burrowed(true)
 		unit.has_acted = true
-		hud.log_message("[Magic] %s が土魔術で地中に潜行しました。" % unit.name)
+		hud.update_turn_info(tm.current_turn, "【%s】土魔術で地中に潜行した！" % unit.name)
+		hud.log_message("[Magic] %s が土魔術で地中に潜行しました（魔女をやり過ごせます）。" % unit.name)
+		_on_unit_action_finished(current_acting_unit_id)
+		
+	elif unit.available_magics.has(Enums.ElementType.WIND):
+		if piece:
+			piece.set_burrowed(false)
+		unit.has_acted = true
+		hud.log_message("[Magic] %s が風魔術を行使しました。" % unit.name)
 		_on_unit_action_finished(current_acting_unit_id)
 		
 	else:
@@ -659,6 +666,9 @@ func _start_unit_movement(unit_id: String, path: Array[Vector2i]) -> void:
 			current_dice_roll = 0
 			hud.hide_dice_result()
 			unit_piece.position = Vector2(unit.current_coord.x * 64 + 16, unit.current_coord.y * 64 + 16)
+			# 移動完了：潜行解除（地上出現）をピース表示にも反映
+			if not unit.is_burrowed:
+				unit_piece.set_burrowed(false)
 			hud.log_message("[Move] %s が %s に停止しました。" % [unit.name, str(unit.current_coord)])
 			if tm.current_phase != Enums.TurnPhase.GAME_OVER and tm.current_phase != Enums.TurnPhase.STAGE_CLEAR:
 				if has_pending_additional_move:
@@ -728,58 +738,60 @@ func _process_enemy_actions(enemy_list: Array[EnemyData], index: int) -> void:
 	var witch_piece = board_view.get_piece(witch.enemy_id)
 	var target = tm.select_witch_target(witch)
 	
+	var target_coord: Vector2i = Vector2i.ZERO
 	if target and witch_piece:
 		witch_piece.set_target_name(target.name)
-		var target_coord = target.current_coord
-		var path = tm.board.find_shortest_path(witch.current_coord, target_coord)
-		var dist = path.size() - 1 if not path.is_empty() else 99
+		target_coord = target.current_coord
+		var path_to_target = tm.board.find_shortest_path(witch.current_coord, target_coord)
+		var dist = path_to_target.size() - 1 if not path_to_target.is_empty() else 99
 		hud.log_message("[Enemy] %s ターゲット: %s (距離: %dマス)" % [witch.enemy_id, target.name, dist])
-		
-		# 魔女は2マス移動（固定歩数）
-		var witch_steps = 2
-		var actual_path: Array[Vector2i] = []
-		for i in range(min(path.size(), witch_steps + 1)):
-			actual_path.append(path[i])
-			
-		if actual_path.size() > 1:
-			hud.log_message("[Enemy] %s が %s から %s へ移動開始" % [witch.enemy_id, str(witch.current_coord), str(actual_path[-1])])
-			witch_piece.animate_path(
-				actual_path,
-				func(to_c: Vector2i, _rem: int):
-					witch.current_coord = to_c
-					# 1. 水魔術トラップ判定
-					var cell = tm.board.get_cell(to_c)
-					if cell and cell.cell_type == Enums.CellType.WATER_TRAP:
-						hud.log_message("[TRAP] %s が水魔術トラップ %s に捕まり、移動が停止した！" % [witch.enemy_id, str(to_c)])
-						DebugLogger.info("MainGame._process_enemy_actions", "魔女が水魔術トラップで移動停止", {"coord": to_c})
-						return {"result": "WATER_TRAP_STOP"}
-					# 2. 味方ユニットとの接触判定
-					for c in tm.characters.values():
-						if c.is_alive and c.current_coord == to_c:
-							if not c.is_burrowed:
-								if c.character_id == "HERO":
-									tm.current_phase = Enums.TurnPhase.GAME_OVER
-									tm.emit_signal("game_over_triggered", "魔女に背後から追いつかれた")
-									return {"result": "GAME_OVER"}
-								else:
-									c.kill()
-									tm.emit_signal("unit_killed", c.character_id)
-									hud.log_message("[Kill] %s が魔女に捕まり倒された！" % c.name)
-									var cp = board_view.get_piece(c.character_id)
-									if cp:
-										cp.visible = false
-									return {"result": "GIRL_DIED"}
-					return {"result": "CONTINUE"},
-				func():
-					_process_enemy_actions(enemy_list, index + 1)
-			)
-		else:
-			hud.log_message("[Enemy] %s は移動先がありませんでした。" % witch.enemy_id)
-			_process_enemy_actions(enemy_list, index + 1)
 	else:
 		if witch_piece:
-			witch_piece.set_target_name("")
-		hud.log_message("[Enemy] 対象が存在しないか、索敵できませんでした。")
+			witch_piece.set_target_name("帰還中")
+		target_coord = witch.initial_coord
+		hud.log_message("[Enemy] %s は対象を見失いました。初期位置 %s へ帰還移動します。" % [witch.enemy_id, str(target_coord)])
+
+	# 魔女の移動処理（ターゲット追跡 または 初期位置帰還）
+	var path = tm.board.find_shortest_path(witch.current_coord, target_coord)
+	var witch_steps = 2
+	var actual_path: Array[Vector2i] = []
+	for i in range(min(path.size(), witch_steps + 1)):
+		actual_path.append(path[i])
+		
+	if actual_path.size() > 1 and witch_piece:
+		hud.log_message("[Enemy] %s が %s から %s へ移動開始" % [witch.enemy_id, str(witch.current_coord), str(actual_path[-1])])
+		witch_piece.animate_path(
+			actual_path,
+			func(to_c: Vector2i, _rem: int):
+				witch.current_coord = to_c
+				# 1. 水魔術トラップ判定
+				var cell = tm.board.get_cell(to_c)
+				if cell and cell.cell_type == Enums.CellType.WATER_TRAP:
+					hud.log_message("[TRAP] %s が水魔術トラップ %s に捕まり、移動が停止した！" % [witch.enemy_id, str(to_c)])
+					DebugLogger.info("MainGame._process_enemy_actions", "魔女が水魔術トラップで移動停止", {"coord": to_c})
+					return {"result": "WATER_TRAP_STOP"}
+				# 2. 味方ユニットとの接触判定
+				for c in tm.characters.values():
+					if c.is_alive and c.current_coord == to_c:
+						if not c.is_burrowed:
+							if c.character_id == "HERO":
+								tm.current_phase = Enums.TurnPhase.GAME_OVER
+								tm.emit_signal("game_over_triggered", "魔女に背後から追いつかれた")
+								return {"result": "GAME_OVER"}
+							else:
+								c.kill()
+								tm.emit_signal("unit_killed", c.character_id)
+								hud.log_message("[Kill] %s が魔女に捕まり倒された！" % c.name)
+								var cp = board_view.get_piece(c.character_id)
+								if cp:
+									cp.visible = false
+								return {"result": "GIRL_DIED"}
+				return {"result": "CONTINUE"},
+			func():
+				_process_enemy_actions(enemy_list, index + 1)
+		)
+	else:
+		hud.log_message("[Enemy] %s は移動先がありませんでした。" % witch.enemy_id)
 		_process_enemy_actions(enemy_list, index + 1)
 
 func _on_enemy_turn_finished() -> void:

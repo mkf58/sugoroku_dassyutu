@@ -108,7 +108,8 @@
 | **正常系** | **UT-MAGIC-N01** | `test_fire_magic_defeats_witch` | 2マス以内の魔女を対象に炎魔法詠唱 | 魔女撃破（`is_alive = false`）、復活カウンタ 2、詠唱者行動済み |
 | **正常系** | **UT-MAGIC-N02** | `test_water_magic_creates_trap` | 盤面マスを対象に水魔法詠唱 | 対象マスが `WATER_TRAP` に変更、詠唱者行動済み |
 | **正常系** | **UT-MAGIC-N03** | `test_burrowed_unit_wait_maintains_burrow` | 潜行中ユニットで「待機・祈る」実行 | `is_burrowed = true` を維持したまま行動済みとなること |
-| **正常系** | **UT-MAGIC-N04** | `test_unburrow_on_action` | 潜行中ユニットで魔法詠唱または移動 | 詠唱・移動と同時に地中から出現し `is_burrowed = false` |
+| **正常系** | **UT-MAGIC-N04** | `test_unburrow_on_action` | 潜行中ユニットで魔法詠唱 | 詠唱と同時に地中から出現し `is_burrowed = false` |
+| **正常系** | **UT-MAGIC-N05** | `test_unburrow_on_movement` | 潜行中ユニットで移動完了（残り歩数0到着） | 到着と同時に地中から出現し `is_burrowed = false` |
 | **準正常系** | **UT-MAGIC-E01** | `test_magic_fails_when_dead` | 死亡中ユニット（`is_alive == false`）で詠唱 | 詠唱拒否（戻り値 `false`） |
 | **準正常系** | **UT-MAGIC-E02** | `test_magic_fails_when_already_acted` | 既に行動済みユニット（`has_acted == true`）で詠唱 | 詠唱拒否（戻り値 `false`） |
 | **準正常系** | **UT-MAGIC-E03** | `test_magic_fails_caster_not_found` | 未登録のキャラクターIDで詠唱 | 詠唱拒否（戻り値 `false`） |

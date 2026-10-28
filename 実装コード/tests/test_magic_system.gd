@@ -12,6 +12,7 @@ func run_all() -> void:
 	test_fire_magic_fails_no_target()
 	test_fire_magic_range_boundary()
 	test_earth_magic_burrow_and_stun()
+	test_unburrow_on_movement()
 
 ## UT-MAGIC-N01: 炎魔法による魔女撃破
 func test_fire_magic_defeats_witch() -> void:
@@ -158,3 +159,19 @@ func test_earth_magic_burrow_and_stun() -> void:
 	var res2 = tm.execute_magic("GIRL_EARTH", Enums.ElementType.EARTH, Vector2i(2, 0))
 	assert_true(res2, "UT-MAGIC-D01: 魔女対象詠唱成功")
 	assert_eq(witch.stun_turns, 1, "UT-MAGIC-D01: 魔女が1ターンスタンすること")
+
+## UT-MAGIC-N05: 移動完了による潜行解除
+func test_unburrow_on_movement() -> void:
+	var tm = TurnManager.new()
+	var board = GridBoard.new()
+	board.add_cell(CellData.new(Vector2i(0, 0), Enums.CellType.NORMAL))
+	board.add_cell(CellData.new(Vector2i(1, 0), Enums.CellType.NORMAL))
+	board.connect_cells(Vector2i(0, 0), Vector2i(1, 0))
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(0, 0))
+	hero.is_burrowed = true # 潜行中
+	tm.setup_stage(board, [hero], [], "STAGE_TEST")
+	
+	# 残り歩数0で到着
+	var res = tm.step_unit(hero, Vector2i(1, 0), 0)
+	assert_eq(res.get("result"), "ARRIVED", "UT-MAGIC-N05: 到着すること")
+	assert_false(hero.is_burrowed, "UT-MAGIC-N05: 移動完了により潜行解除されること")
