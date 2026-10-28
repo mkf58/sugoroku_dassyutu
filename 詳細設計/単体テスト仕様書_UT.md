@@ -134,7 +134,8 @@
 | **準正常系** | **UT-TURN-E01** | `test_select_character_fails_when_dead` | 死亡中ユニットを選択 | 選択拒否（戻り値 `false`） |
 | **準正常系** | **UT-TURN-E02** | `test_select_character_fails_when_acted` | 行動済みユニットを選択 | 選択拒否（戻り値 `false`） |
 | **準正常系** | **UT-TURN-E03** | `test_select_character_fails_when_skipped` | 1回休み（`is_skipped == true`）のユニットを選択 | 選択拒否（戻り値 `false`） |
-| **準正常系** | **UT-TURN-E04** | `test_select_character_fails_not_found` | 未登録キャラクターIDを選択 | 選択拒否（戻り値 `false`） |
+| **正常系** | **UT-TURN-N04** | `test_multiple_allies_sequential_action` | 主人公行動後に未行動の少女が存在 | 主人公が選択不可になり、少女が選択可能。次ターンで両者リセット |
+| **正常系** | **UT-TURN-N05** | `test_girl_death_during_step_movement` | 少女が魔女のいるマスへ1歩侵入 | 戻り値 `GIRL_DIED`、少女のみ死亡（カウント3）、ゲームオーバーにならない |
 | **境界値** | **UT-TURN-B01** | `test_revive_exact_turn_boundary` | 復活カウント 1（前ターン） vs 0（完了時） | カウント1では依然死亡、0になった瞬間に完全復活 |
 
 ---

@@ -26,6 +26,7 @@ var has_pending_additional_move: bool = false
 var has_pending_roll_again: bool = false
 var inventory: Array[Dictionary] = []
 var current_stage_data: StageData = null
+var current_acting_unit_id: String = "HERO"
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -53,8 +54,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _get_enemy_obstacles() -> Array[Vector2i]:
 	var obstacles: Array[Vector2i] = []
-	var hero = tm.characters.get("HERO", null)
-	if hero and not hero.is_burrowed:
+	var unit = tm.characters.get(current_acting_unit_id, null)
+	if unit and not unit.is_burrowed:
 		for e in tm.enemies.values():
 			if e.is_alive:
 				obstacles.append(e.current_coord)
@@ -142,22 +143,8 @@ func load_stage(stage_id: String, preserve_inventory: bool = false) -> void:
 	camera.zoom = stage_data.initial_camera_zoom
 
 	tm.setup_stage(stage_data.board, characters, enemies, stage_data.stage_id)
-	tm.start_player_turn()
-	tm.select_character("HERO")
-
-	current_dice_roll = 0
-	reachable_cells.clear()
-	selected_path.clear()
-	is_moving = false
-
-	hud.update_turn_info(tm.current_turn, "主人公の行動を選択")
-	hud.set_action_buttons_enabled(true)
-	hud.set_action_panel_visible(false)
 	hud.log_message("[%s] 開始！" % stage_data.stage_name)
-	hud.log_message("[Turn 1] プレイヤーターン開始。行動コマンドを選択してください。")
-
-	# 行動選択メニューを表示
-	call_deferred("_show_action_command_menu")
+	_start_player_turn_flow()
 
 func _bind_events() -> void:
 	hud.roll_dice_pressed.connect(_on_roll_dice)
@@ -209,68 +196,196 @@ func _bind_turn_manager_events() -> void:
 		stage_clear_screen.show_clear(tm.current_turn, s_name, has_next)
 	)
 
-	
 	tm.water_trap_triggered.connect(func(unit_id, coord):
 		hud.log_message("[TRAP] %s が水魔術トラップ %s に侵入！残歩数破棄・即ターンエンド" % [unit_id, str(coord)])
+	)
+
+	tm.unit_killed.connect(func(unit_id):
+		var cp = board_view.get_piece(unit_id)
+		if cp:
+			cp.visible = false
+		var u = tm.characters.get(unit_id, null)
+		var u_name = u.name if u else unit_id
+		hud.log_message("[Kill] %s が魔女に捕まり倒された！（3ターン後に初期位置で復活）" % u_name)
 	)
 
 	tm.cell_event_triggered.connect(func(cell_data: CellData):
 		_handle_cell_event(cell_data)
 	)
 
-
 	tm.additional_move_granted.connect(func(unit_id, steps):
-		if unit_id == "HERO":
+		if unit_id == current_acting_unit_id:
 			has_pending_additional_move = true
 			pending_additional_steps = steps
 	)
 
 	tm.roll_again_granted.connect(func(unit_id):
-		if unit_id == "HERO":
+		if unit_id == current_acting_unit_id:
 			has_pending_roll_again = true
 	)
 
 	tm.returned_to_start_applied.connect(func(unit_id):
-		if unit_id == "HERO":
-			var hero = tm.characters["HERO"]
-			var p = board_view.get_piece("HERO")
-			if p:
-				if p.current_tween and p.current_tween.is_valid():
-					p.current_tween.kill()
-				p.position = Vector2(hero.initial_coord.x * 64 + 16, hero.initial_coord.y * 64 + 16)
-			hud.log_message("[Cell] 振り出しマス！スタート位置に戻されました。")
+		var unit = tm.characters.get(unit_id, null)
+		var p = board_view.get_piece(unit_id)
+		if p and unit:
+			if p.current_tween and p.current_tween.is_valid():
+				p.current_tween.kill()
+			p.position = Vector2(unit.initial_coord.x * 64 + 16, unit.initial_coord.y * 64 + 16)
+		var u_name = unit.name if unit else unit_id
+		hud.log_message("[Cell] 振り出しマス！%s はスタート位置に戻されました。" % u_name)
 	)
 
 
 
+
+func _start_player_turn_flow() -> void:
+	tm.start_player_turn()
+	current_dice_roll = 0
+	reachable_cells.clear()
+	selected_path.clear()
+	is_moving = false
+	
+	# 生存中の未潜行魔女情報をログ表示
+	var witch_info = ""
+	for e in tm.enemies.values():
+		if e.is_alive:
+			witch_info += "%s:%s " % [e.enemy_id, str(e.current_coord)]
+	if witch_info.is_empty():
+		witch_info = "なし"
+	hud.log_message("[Turn %d] プレイヤーターン開始！魔女配置: %s" % [tm.current_turn, witch_info])
+	
+	_start_next_player_action()
+
+func _get_next_acting_unit_id() -> String:
+	# 1. 主人公が生存・未行動・未スキップなら最優先
+	if tm.characters.has("HERO"):
+		var hero = tm.characters["HERO"]
+		if hero.is_alive and not hero.has_acted and not hero.is_skipped:
+			return "HERO"
+
+	# 2. 同行仲間キャラ（少女たち）で生存・未行動・未スキップのユニットを探す
+	for c_id in tm.characters.keys():
+		if c_id == "HERO":
+			continue
+		var c = tm.characters[c_id]
+		if c.is_alive and not c.has_acted and not c.is_skipped:
+			return c_id
+
+	return ""
+
+func _start_next_player_action() -> void:
+	var next_id = _get_next_acting_unit_id()
+	if next_id.is_empty():
+		# 全味方ユニットが行動完了（または行動不能）
+		# 休み中ユニットのログ出力
+		for c in tm.characters.values():
+			if c.is_alive and c.is_skipped:
+				hud.log_message("[Turn %d] %s は1回休みのため行動をスキップしました。" % [tm.current_turn, c.name])
+		
+		hud.log_message("[Turn %d] 全味方ユニットの行動が完了しました。魔女のターンへ移行します。" % tm.current_turn)
+		_advance_to_enemy_turn()
+		return
+
+	current_acting_unit_id = next_id
+	tm.select_character(current_acting_unit_id)
+	
+	var unit = tm.characters[current_acting_unit_id]
+	hud.update_turn_info(tm.current_turn, "【%s】の行動を選択 [右クリック: 盤面確認]" % unit.name)
+	hud.set_action_buttons_enabled(true)
+	hud.set_action_panel_visible(false)
+	hud.log_message("[Turn %d] %s の行動選択です (座標: %s)" % [tm.current_turn, unit.name, str(unit.current_coord)])
+	
+	# 操作キャラのピースを発光表示
+	for c_id in tm.characters.keys():
+		var p = board_view.get_piece(c_id)
+		if p:
+			p.set_active_highlight(c_id == current_acting_unit_id)
+
+	call_deferred("_show_action_command_menu")
+
+func _find_alive_enemies_in_range(origin_coord: Vector2i, max_distance: int) -> Array[EnemyData]:
+	var result: Array[EnemyData] = []
+	var list_with_dist: Array[Dictionary] = []
+	for e in tm.enemies.values():
+		if e.is_alive:
+			var path = tm.board.find_shortest_path(origin_coord, e.current_coord) if tm.board else []
+			var dist = path.size() - 1 if not path.is_empty() else 999
+			if dist <= max_distance:
+				list_with_dist.append({"enemy": e, "dist": dist})
+	list_with_dist.sort_custom(func(a, b): return a["dist"] < b["dist"])
+	for item in list_with_dist:
+		result.append(item["enemy"])
+	return result
 
 func _show_action_command_menu(custom_mouse_pos: Vector2 = Vector2.ZERO) -> void:
 	if is_moving or current_dice_roll > 0:
 		return
 	if tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
 		return
-	var hero = tm.characters.get("HERO", null)
-	if not hero or not hero.is_alive or hero.has_acted:
+	var unit = tm.characters.get(current_acting_unit_id, null)
+	if not unit or not unit.is_alive or unit.has_acted:
 		return
 	
 	# 操作中キャラの発光表示
-	var hero_piece = board_view.get_piece("HERO")
-	if hero_piece:
-		hero_piece.set_active_highlight(true)
+	for c_id in tm.characters.keys():
+		var p = board_view.get_piece(c_id)
+		if p:
+			p.set_active_highlight(c_id == current_acting_unit_id)
+
+	# 魔法名・説明・使用可否の判定
+	var magic_name = "魔法なし"
+	var magic_desc = "使用可能な魔法がありません"
+	var can_magic = false
 	
-	action_command_menu.setup_unit("HERO", "主人公", "地中潜行", "魔女の接触をやり過ごす", true, hero.is_burrowed, inventory.size())
+	if current_acting_unit_id == "HERO":
+		magic_name = "土魔術"
+		magic_desc = "地中に潜行して魔女をやり過ごす（移動不可）"
+		can_magic = not unit.is_burrowed
+	elif unit.available_magics.has(Enums.ElementType.FIRE):
+		magic_name = "炎魔術"
+		var nearby_witches = _find_alive_enemies_in_range(unit.current_coord, 2)
+		if nearby_witches.size() > 0:
+			var w_names: Array[String] = []
+			for w in nearby_witches:
+				w_names.append(w.enemy_id)
+			magic_desc = "2マス以内の魔女を撃破 (%s)" % ", ".join(w_names)
+			can_magic = true
+		else:
+			magic_desc = "2マス以内に魔女がいません (射程2マス)"
+			can_magic = false
+	elif unit.available_magics.has(Enums.ElementType.WATER):
+		magic_name = "水魔術"
+		magic_desc = "現在地に水魔術トラップを設置"
+		can_magic = true
+	elif unit.available_magics.has(Enums.ElementType.WIND):
+		magic_name = "風魔術"
+		magic_desc = "直線の魔女または自分を吹き飛ばす"
+		can_magic = true
+	elif unit.available_magics.has(Enums.ElementType.EARTH):
+		magic_name = "土魔術"
+		magic_desc = "地中に潜行して魔女をやり過ごす"
+		can_magic = not unit.is_burrowed
+	
+	action_command_menu.setup_unit(
+		current_acting_unit_id,
+		unit.name,
+		magic_name,
+		magic_desc,
+		can_magic,
+		unit.is_burrowed,
+		inventory.size()
+	)
 	action_command_menu.popup_at_mouse(custom_mouse_pos)
-	hud.update_turn_info(tm.current_turn, "主人公の行動を選択 [右クリック: 盤面確認]")
+	hud.update_turn_info(tm.current_turn, "【%s】の行動を選択 [右クリック: 盤面確認]" % unit.name)
 	hud.set_action_panel_visible(false)
 
 func _on_command_menu_closed() -> void:
 	# 盤面確認モード時はキャラ発光を標準に戻す
-	var hero_piece = board_view.get_piece("HERO")
-	if hero_piece:
-		hero_piece.set_active_highlight(false)
-	hud.update_turn_info(tm.current_turn, "盤面確認中 [右クリックで行動選択]")
+	var p = board_view.get_piece(current_acting_unit_id)
+	if p:
+		p.set_active_highlight(false)
+	hud.update_turn_info(tm.current_turn, "盤面確認中 [味方キャラまたは右クリックで行動選択]")
 	DebugLogger.info("MainGame._on_command_menu_closed", "盤面確認モードへ移行")
-
 
 func _on_item_menu_pressed() -> void:
 	action_command_menu.visible = false
@@ -296,14 +411,14 @@ func _on_item_used(item_id: String) -> void:
 	current_dice_roll = dice_val
 	hud.show_dice_result(current_dice_roll)
 	
-	var hero = tm.characters["HERO"]
+	var unit = tm.characters[current_acting_unit_id]
 	var obstacles = _get_enemy_obstacles()
-	reachable_cells = tm.board.get_reachable_cells_with_steps(hero.current_coord, current_dice_roll, obstacles)
+	reachable_cells = tm.board.get_reachable_cells_with_steps(unit.current_coord, current_dice_roll, obstacles)
 	board_view.clear_highlights()
 	for c in reachable_cells.keys():
 		board_view.set_cell_highlight(c, true, Color(0.3, 0.8, 1.0, 0.8))
 		
-	hud.update_turn_info(tm.current_turn, "【%s】使用！移動先をクリック (出目: %d)" % [used_item.get("name", "賽"), current_dice_roll])
+	hud.update_turn_info(tm.current_turn, "【%s】使用！%sの移動先をクリック (出目: %d)" % [used_item.get("name", "賽"), unit.name, current_dice_roll])
 	hud.log_message("[Item] 【%s】を使用！出目 %d が確定しました。(残り所持: %d個)" % [used_item.get("name", "賽"), current_dice_roll, inventory.size()])
 	DebugLogger.info("MainGame._on_item_used", "アイテム使用完了: " + str(used_item.get("name", "")))
 
@@ -334,24 +449,24 @@ func _on_roll_dice() -> void:
 	current_dice_roll = randi_range(1, 6)
 	hud.show_dice_result(current_dice_roll)
 	
-	var hero = tm.characters["HERO"]
+	var unit = tm.characters[current_acting_unit_id]
 	var obstacles = _get_enemy_obstacles()
-	reachable_cells = tm.board.get_reachable_cells_with_steps(hero.current_coord, current_dice_roll, obstacles)
+	reachable_cells = tm.board.get_reachable_cells_with_steps(unit.current_coord, current_dice_roll, obstacles)
 	board_view.clear_highlights()
 	for c in reachable_cells.keys():
 		board_view.set_cell_highlight(c, true, Color(0.3, 0.8, 1.0, 0.8))
 		
-	hud.update_turn_info(tm.current_turn, "移動先をクリック (出目: %d)" % current_dice_roll)
+	hud.update_turn_info(tm.current_turn, "【%s】移動先をクリック (出目: %d)" % [unit.name, current_dice_roll])
 	hud.set_action_buttons_enabled(false)
-	DebugLogger.info("MainGame._on_roll_dice", "ダイス出目 %d (到達可能マス: %d箇所)" % [current_dice_roll, reachable_cells.size()])
+	DebugLogger.info("MainGame._on_roll_dice", "%s ダイス出目 %d (到達可能マス: %d箇所)" % [unit.name, current_dice_roll, reachable_cells.size()])
 
 func _on_cell_hovered(coord: Vector2i) -> void:
 	if is_moving or current_dice_roll <= 0:
 		return
 	if reachable_cells.has(coord):
-		var hero = tm.characters["HERO"]
+		var unit = tm.characters[current_acting_unit_id]
 		var obstacles = _get_enemy_obstacles()
-		var preview_path = tm.board.find_path_with_steps(hero.current_coord, coord, current_dice_roll, obstacles)
+		var preview_path = tm.board.find_path_with_steps(unit.current_coord, coord, current_dice_roll, obstacles)
 		if not preview_path.is_empty():
 			board_view.update_route_preview(preview_path)
 
@@ -364,15 +479,58 @@ func _on_magic_pressed() -> void:
 		return
 		
 	action_command_menu.visible = false
-	var hero = tm.characters["HERO"]
-	hero.is_burrowed = true
-	var piece = board_view.get_piece("HERO")
-	if piece:
-		piece.set_burrowed(true)
-	hero.has_acted = true
-	hud.update_turn_info(tm.current_turn, "土魔術で地中に潜行した！")
-	DebugLogger.info("MainGame._on_magic_pressed", "土魔術発動！地中に潜行（魔女やり過ごし有効）")
-	_advance_to_enemy_turn()
+	var unit = tm.characters.get(current_acting_unit_id, null)
+	if not unit:
+		return
+		
+	if current_acting_unit_id == "HERO":
+		unit.is_burrowed = true
+		var piece = board_view.get_piece("HERO")
+		if piece:
+			piece.set_burrowed(true)
+		unit.has_acted = true
+		hud.update_turn_info(tm.current_turn, "主人公は土魔術で地中に潜行した！")
+		hud.log_message("[Magic] 主人公が土魔術を発動！地中に潜行しました（魔女をやり過ごせます）。")
+		DebugLogger.info("MainGame._on_magic_pressed", "土魔術発動！地中に潜行（魔女やり過ごし有効）")
+		_on_unit_action_finished(current_acting_unit_id)
+		
+	elif unit.available_magics.has(Enums.ElementType.FIRE):
+		var nearby_witches = _find_alive_enemies_in_range(unit.current_coord, 2)
+		if nearby_witches.is_empty():
+			DebugLogger.warn("MainGame._on_magic_pressed", "2マス以内に魔女が存在しません")
+			_show_action_command_menu()
+			return
+		var target_witch = nearby_witches[0]
+		var ok = tm.execute_magic(current_acting_unit_id, Enums.ElementType.FIRE, target_witch.current_coord)
+		if ok:
+			var wp = board_view.get_piece(target_witch.enemy_id)
+			if wp:
+				wp.visible = false
+			hud.log_message("[Magic] 【炎魔術】発動！%s が %s を撃破しました！（2ターン後に復活）" % [unit.name, target_witch.enemy_id])
+			DebugLogger.info("MainGame._on_magic_pressed", "炎魔術発動成功: target=" + target_witch.enemy_id)
+		_on_unit_action_finished(current_acting_unit_id)
+		
+	elif unit.available_magics.has(Enums.ElementType.WATER):
+		var ok = tm.execute_magic(current_acting_unit_id, Enums.ElementType.WATER, unit.current_coord)
+		if ok:
+			hud.log_message("[Magic] 【水魔術】発動！座標 %s を水トラップマスに変化させました。" % str(unit.current_coord))
+			var cell_node = board_view.cell_nodes.get(unit.current_coord, null)
+			if cell_node:
+				cell_node.setup(tm.board.get_cell(unit.current_coord))
+		_on_unit_action_finished(current_acting_unit_id)
+		
+	elif unit.available_magics.has(Enums.ElementType.EARTH):
+		unit.is_burrowed = true
+		var piece = board_view.get_piece(current_acting_unit_id)
+		if piece:
+			piece.set_burrowed(true)
+		unit.has_acted = true
+		hud.log_message("[Magic] %s が土魔術で地中に潜行しました。" % unit.name)
+		_on_unit_action_finished(current_acting_unit_id)
+		
+	else:
+		DebugLogger.warn("MainGame._on_magic_pressed", "使用可能な魔法がありません", {"unit_id": current_acting_unit_id})
+		_show_action_command_menu()
 
 func _on_wait_pressed() -> void:
 	if is_moving:
@@ -383,21 +541,32 @@ func _on_wait_pressed() -> void:
 		return
 		
 	action_command_menu.visible = false
-	tm.execute_wait("HERO")
-	hud.update_turn_info(tm.current_turn, "祈りを捧げて待機した")
-	DebugLogger.info("MainGame._on_wait_pressed", "主人公は祈りを捧げて待機しました")
-	_advance_to_enemy_turn()
+	var unit = tm.characters.get(current_acting_unit_id, null)
+	var u_name = unit.name if unit else current_acting_unit_id
+	tm.execute_wait(current_acting_unit_id)
+	hud.update_turn_info(tm.current_turn, "【%s】祈りを捧げて待機した" % u_name)
+	hud.log_message("[Wait] %s は祈りを捧げてその場で待機しました。" % u_name)
+	DebugLogger.info("MainGame._on_wait_pressed", "%s は待機しました" % u_name)
+	_on_unit_action_finished(current_acting_unit_id)
 
 func _on_cell_clicked(coord: Vector2i) -> void:
 	if is_moving:
-		var hero_piece = board_view.get_piece("HERO")
-		if hero_piece and selected_path.size() > 0:
-			hero_piece.skip_current_move(selected_path[-1])
+		var p = board_view.get_piece(current_acting_unit_id)
+		if p and selected_path.size() > 0:
+			p.skip_current_move(selected_path[-1])
 			DebugLogger.info("MainGame._on_cell_clicked", "クリックにより移動アニメーションをスキップ")
 		return
 
 	if current_dice_roll <= 0:
-		# コマンド選択前に盤面をクリックした場合はコマンドメニューを開く
+		# コマンド選択前：クリックしたマスに未行動の味方ユニットがいればそのキャラに切り替え
+		for c in tm.characters.values():
+			if c.is_alive and not c.has_acted and not c.is_skipped and c.current_coord == coord:
+				current_acting_unit_id = c.character_id
+				tm.select_character(current_acting_unit_id)
+				hud.log_message("[Select] 操作ユニットを【%s】に切り替えました。" % c.name)
+				_show_action_command_menu()
+				return
+				
 		if not action_command_menu.visible:
 			_show_action_command_menu()
 		return
@@ -406,16 +575,16 @@ func _on_cell_clicked(coord: Vector2i) -> void:
 		DebugLogger.warn("MainGame._on_cell_clicked", "指定マスはこの出目では移動できません", {"clicked_coord": coord, "dice_roll": current_dice_roll})
 		return
 
-	var hero = tm.characters["HERO"]
+	var unit = tm.characters[current_acting_unit_id]
 	var obstacles = _get_enemy_obstacles()
-	selected_path = tm.board.find_path_with_steps(hero.current_coord, coord, current_dice_roll, obstacles)
+	selected_path = tm.board.find_path_with_steps(unit.current_coord, coord, current_dice_roll, obstacles)
 	if selected_path.is_empty():
-		DebugLogger.error("MainGame._on_cell_clicked", "移動経路の生成に失敗しました", {"from": hero.current_coord, "to": coord, "steps": current_dice_roll})
+		DebugLogger.error("MainGame._on_cell_clicked", "移動経路の生成に失敗しました", {"from": unit.current_coord, "to": coord, "steps": current_dice_roll})
 		return
 
 	board_view.update_route_preview(selected_path)
-	DebugLogger.info("MainGame._on_cell_clicked", "移動開始: %s -> %s (歩数: %d)" % [str(hero.current_coord), str(coord), current_dice_roll])
-	_start_hero_movement(selected_path)
+	DebugLogger.info("MainGame._on_cell_clicked", "移動開始: %s -> %s (歩数: %d)" % [str(unit.current_coord), str(coord), current_dice_roll])
+	_start_unit_movement(current_acting_unit_id, selected_path)
 
 func _on_right_click() -> void:
 	_go_back()
@@ -444,7 +613,6 @@ func _go_back() -> void:
 		return
 	
 	# 4. コマンドメニューが開いている場合：閉じて盤面確認モードへ
-
 	if action_command_menu and action_command_menu.visible:
 		action_command_menu.close_menu()
 		DebugLogger.info("MainGame._go_back", "コマンドメニューを閉じて盤面確認モードへ")
@@ -454,29 +622,29 @@ func _go_back() -> void:
 	_show_action_command_menu(mouse_pos)
 	DebugLogger.info("MainGame._go_back", "盤面確認モードからコマンドメニューを再展開")
 
-
-
-
-func _start_hero_movement(path: Array[Vector2i]) -> void:
+func _start_unit_movement(unit_id: String, path: Array[Vector2i]) -> void:
 	is_moving = true
 	board_view.clear_highlights()
 	board_view.clear_route_preview()
 	
-	var hero = tm.characters["HERO"]
-	var hero_piece = board_view.get_piece("HERO")
+	var unit = tm.characters[unit_id]
+	var unit_piece = board_view.get_piece(unit_id)
+	if not unit_piece:
+		DebugLogger.error("MainGame._start_unit_movement", "UnitPieceが存在しません", {"id": unit_id})
+		is_moving = false
+		return
 	
-	hero_piece.animate_path(
+	unit_piece.animate_path(
 		path,
 		func(to_coord: Vector2i, remaining: int):
-			return tm.step_unit(hero, to_coord, remaining),
+			return tm.step_unit(unit, to_coord, remaining),
 		func():
 			is_moving = false
 			current_dice_roll = 0
 			hud.hide_dice_result()
-			hero_piece.position = Vector2(hero.current_coord.x * 64 + 16, hero.current_coord.y * 64 + 16)
-			hud.log_message("[Move] 主人公が %s に停止しました。" % str(hero.current_coord))
+			unit_piece.position = Vector2(unit.current_coord.x * 64 + 16, unit.current_coord.y * 64 + 16)
+			hud.log_message("[Move] %s が %s に停止しました。" % [unit.name, str(unit.current_coord)])
 			if tm.current_phase != Enums.TurnPhase.GAME_OVER and tm.current_phase != Enums.TurnPhase.STAGE_CLEAR:
-
 				if has_pending_additional_move:
 					has_pending_additional_move = false
 					hud.log_message("[Cell] +%dマスに停止！追加で%dマス移動します！" % [pending_additional_steps, pending_additional_steps])
@@ -487,21 +655,32 @@ func _start_hero_movement(path: Array[Vector2i]) -> void:
 					hud.update_turn_info(tm.current_turn, "もう1回！ダイスを振ってください")
 					hud.set_action_buttons_enabled(true)
 				else:
-					_advance_to_enemy_turn()
+					_on_unit_action_finished(unit_id)
 	)
 
 func _trigger_additional_move(steps: int) -> void:
 	current_dice_roll = steps
 	hud.show_dice_result(current_dice_roll)
-	var hero = tm.characters["HERO"]
+	var unit = tm.characters[current_acting_unit_id]
 	var obstacles = _get_enemy_obstacles()
-	reachable_cells = tm.board.get_reachable_cells_with_steps(hero.current_coord, current_dice_roll, obstacles)
+	reachable_cells = tm.board.get_reachable_cells_with_steps(unit.current_coord, current_dice_roll, obstacles)
 	board_view.clear_highlights()
 	for c in reachable_cells.keys():
 		board_view.set_cell_highlight(c, true, Color(0.3, 0.8, 1.0, 0.8))
 	hud.update_turn_info(tm.current_turn, "追加移動！(+%dマス) 移動先をクリック" % steps)
 	hud.set_action_buttons_enabled(false)
 	DebugLogger.info("MainGame._trigger_additional_move", "追加移動発動: +%dマス (到達可能マス: %d箇所)" % [steps, reachable_cells.size()])
+
+func _on_unit_action_finished(unit_id: String) -> void:
+	var unit = tm.characters.get(unit_id, null)
+	if unit:
+		unit.has_acted = true
+	var p = board_view.get_piece(unit_id)
+	if p:
+		p.set_active_highlight(false)
+		
+	# 次の未行動味方ユニットへ進む（全員行動済みなら魔女ターンへ）
+	_start_next_player_action()
 
 
 func _advance_to_enemy_turn() -> void:
@@ -590,41 +769,31 @@ func _on_enemy_turn_finished() -> void:
 	if tm.current_phase == Enums.TurnPhase.GAME_OVER:
 		return
 		
-	# 次のターンへ進行
+	# 次のターンへ進行（少女・魔女の復活カウント更新、ターン数+1）
 	tm.end_turn_and_advance()
 	
-	var hero = tm.characters["HERO"]
-	var hero_piece = board_view.get_piece("HERO")
-	if hero_piece:
-		hero_piece.set_burrowed(false) # 潜行解除
-		
-	current_dice_roll = 0
-	reachable_cells.clear()
-	selected_path.clear()
-	is_moving = false
-
-	# 主人公を行動選択状態にする（1回休みの場合は自動スキップ）
-	if not tm.select_character("HERO"):
-		if hero.has_acted or hero.is_skipped:
-			action_command_menu.visible = false
-			hud.update_turn_info(tm.current_turn, "主人公は1回休み中...")
-			hud.log_message("[Turn %d] 主人公は1回休みのため行動をスキップし、魔女のターンへ進みます。" % tm.current_turn)
-			get_tree().create_timer(1.2).timeout.connect(func():
-				_advance_to_enemy_turn()
-			)
-			return
-
-	hud.update_turn_info(tm.current_turn, "主人公の行動を選択 [右クリック: 盤面確認]")
-	hud.set_action_buttons_enabled(true)
-	hud.set_action_panel_visible(false)
-	var witch_info = ""
+	# 味方ユニットの潜行解除・復活グラフィック同期
+	for c in tm.characters.values():
+		var cp = board_view.get_piece(c.character_id)
+		if cp:
+			if c.is_alive and not cp.visible:
+				cp.visible = true
+				cp.position = Vector2(c.current_coord.x * 64 + 16, c.current_coord.y * 64 + 16)
+				hud.log_message("[Revive] %s が初期位置で復活しました！" % c.name)
+			if not c.is_burrowed:
+				cp.set_burrowed(false)
+				
+	# 魔女の復活同期
 	for e in tm.enemies.values():
-		if e.is_alive:
-			witch_info += "%s:%s " % [e.enemy_id, str(e.current_coord)]
-	if witch_info.is_empty():
-		witch_info = "なし"
-	hud.log_message("[Turn %d] プレイヤーターン開始！主人公: %s, 魔女: %s" % [tm.current_turn, str(hero.current_coord), witch_info])
-	_show_action_command_menu()
+		var ep = board_view.get_piece(e.enemy_id)
+		if ep:
+			if e.is_alive and not ep.visible:
+				ep.visible = true
+				ep.position = Vector2(e.current_coord.x * 64 + 16, e.current_coord.y * 64 + 16)
+				hud.log_message("[Revive] 魔女 %s が初期位置で復活しました！" % e.enemy_id)
+
+	# プレイヤーターン開始フローを実行
+	_start_player_turn_flow()
 
 
 func _on_retry() -> void:
