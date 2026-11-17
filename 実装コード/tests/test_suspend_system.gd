@@ -132,7 +132,6 @@ func test_dict_round_trip_via_json() -> void:
     _progress(tm)
     var s = SuspendData.capture(tm, _make_board())
     s.active_slot = 2
-    s.checkpoint_valid = true
     var inv: Array[Dictionary] = []
     inv.append({"id": "DICE_4", "name": "4の賽", "value": 4, "type": "FIXED_DICE"})
     s.inventory = inv
@@ -145,7 +144,6 @@ func test_dict_round_trip_via_json() -> void:
     assert_eq(r.current_turn, 5, "UT-SUSP-N04: ターン数はint")
     assert_eq(typeof(r.current_turn), TYPE_INT, "UT-SUSP-N04: ターン数の型")
     assert_eq(r.active_slot, 2, "UT-SUSP-N04: アクティブスロット")
-    assert_true(r.checkpoint_valid, "UT-SUSP-N04: チェックポイント有効")
     assert_eq(r.inventory[0]["value"], 4, "UT-SUSP-N04: アイテム値")
     assert_eq(typeof(r.inventory[0]["value"]), TYPE_INT, "UT-SUSP-N04: アイテム値の型")
     var dst = _make_tm(_make_board())

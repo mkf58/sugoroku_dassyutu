@@ -81,13 +81,6 @@ static func latest_slot(dir: String = SAVE_DIR) -> int:
             best_time = d.saved_at
     return best
 
-## 「はじめから」開始時に自動セーブ先とするスロット。空きの若い番号、全使用なら1。
-static func pick_new_game_slot(dir: String = SAVE_DIR) -> int:
-    for s in range(1, SLOT_COUNT + 1):
-        if not has_slot(s, dir):
-            return s
-    return 1
-
 ## ===== 中断セーブ（一時離席用・1枠・ロードすると消える） =====
 const SUSPEND_FILE: String = "suspend.json"
 

@@ -34,7 +34,6 @@ var visited_event_ids: Array = []
 var progress_flags: Dictionary = {}
 var clear_flags: Dictionary = {}
 var achievement_counters: Dictionary = {}
-var checkpoint_valid: bool = false  # true: リトライ時に active_slot のセーブから復帰できる
 var is_enemy_turn: bool = false
 var suspend_btn: Button = null
 
@@ -91,33 +90,29 @@ func _ready() -> void:
 		_resume_from_suspend(suspend)
 	elif resume != null:
 		_apply_save_data(resume)
-		checkpoint_valid = true
 		load_stage(resume.next_stage_id, true)
 	else:
-		_reset_progress()
-		load_stage(start_id, false)
+		# タイトルを経由せずに直接起動された場合（開発用）：スロットに初期セーブを作って開始する
+		_start_new_run(start_id)
 
-## 新規ゲーム開始時：引き継ぎ状態を初期化する
-func _reset_progress() -> void:
-	visited_event_ids.clear()
-	progress_flags.clear()
-	clear_flags.clear()
-	achievement_counters.clear()
-	checkpoint_valid = false
+## 新しい周回を開始：active_slot に初期セーブを作成し、そこから開始する
+func _start_new_run(first_stage_id: String = "STAGE_1") -> void:
+	var data = SaveData.new_game(first_stage_id)
+	if not SaveManager.save_slot(active_slot, data):
+		DebugLogger.error("MainGame._start_new_run", "初期セーブの作成に失敗しました", {"slot": active_slot})
+	_apply_save_data(data)
+	load_stage(first_stage_id, true)
 
-## セーブ（チェックポイント）へ戻ってステージをやり直す。セーブが無ければ最初から。
-func _restore_checkpoint_or_restart() -> void:
-	var data: SaveData = null
-	if checkpoint_valid:
-		data = SaveManager.load_slot(active_slot)
-	if data != null:
-		_apply_save_data(data)
-		hud.log_message("[Load] スロット%dのセーブから再開します。" % active_slot)
-		load_stage(data.next_stage_id, true)
-	else:
-		hud.log_message("[Retry] セーブが無いため最初からやり直します。")
-		_reset_progress()
-		load_stage("STAGE_1", false)
+## セーブ（ステージ開始時の状態）をロードしてやり直す。リトライ・タイトル復帰後の「つづきから」と同じ挙動。
+func _restore_checkpoint() -> void:
+	var data = SaveManager.load_slot(active_slot)
+	if data == null:
+		DebugLogger.error("MainGame._restore_checkpoint", "セーブの読込に失敗しました。最初から開始します", {"slot": active_slot})
+		_start_new_run("STAGE_1")
+		return
+	_apply_save_data(data)
+	hud.log_message("[Load] スロット%dのセーブから再開します。" % active_slot)
+	load_stage(data.next_stage_id, true)
 ## セーブデータの内容を引き継ぎ状態へ反映する
 func _apply_save_data(data: SaveData) -> void:
 	inventory = data.inventory.duplicate(true)
@@ -161,15 +156,7 @@ func load_stage(stage_id: String, preserve_inventory: bool = false) -> void:
 
 	# インベントリ初期化（引き継ぎ指定がない場合のみ初期ダイスをセット）
 	if not preserve_inventory:
-		inventory.clear()
-		inventory.append({
-			"id": "DICE_1_INIT",
-			"name": "1の賽",
-			"desc": "出目が必ず【1】になる固定ダイス",
-			"value": 1,
-			"type": "FIXED_DICE",
-			"icon_text": "🎲"
-		})
+		inventory = SaveData.initial_inventory()
 
 	tm = TurnManager.new()
 	_bind_turn_manager_events()
@@ -270,7 +257,6 @@ func _bind_turn_manager_events() -> void:
 		# ステージクリア時のオートセーブ（次ステージが存在する場合のみ）
 		if has_next:
 			if SaveManager.save_slot(active_slot, _build_save_data()):
-				checkpoint_valid = true
 				hud.log_message("[Save] スロット%dにオートセーブしました。" % active_slot)
 			else:
 				hud.log_message("[Save] オートセーブに失敗しました。")
@@ -915,7 +901,7 @@ func _on_retry() -> void:
 	item_select_modal.visible = false
 	hud.set_action_buttons_enabled(true)
 	# ゲームオーバー後は、セーブ（無ければ最初）から始め直す。タイトルへ戻った場合も「つづきから」で同じ状態になる
-	_restore_checkpoint_or_restart()
+	_restore_checkpoint()
 func _on_stage_clear_retry() -> void:
 	game_over_screen.visible = false
 	stage_clear_screen.visible = false
@@ -929,8 +915,7 @@ func _on_stage_clear_retry() -> void:
 		load_stage(current_stage_data.next_stage_id, true)
 	else:
 		hud.log_message("[Clear Finish] 全階層脱出完了！最初からやり直します。")
-		_reset_progress()
-		load_stage("STAGE_1", false)
+		_start_new_run("STAGE_1")
 
 func _on_title_return() -> void:
 	DebugLogger.info("MainGame._on_title_return", "タイトル画面へ遷移します")
@@ -983,7 +968,6 @@ func _on_suspend_pressed() -> void:
 	data.clear_flags = clear_flags.duplicate(true)
 	data.achievement_counters = achievement_counters.duplicate(true)
 	data.active_slot = active_slot
-	data.checkpoint_valid = checkpoint_valid
 	if SaveManager.save_suspend(data):
 		hud.log_message("[Suspend] 中断セーブしました。タイトルへ戻ります。")
 		_on_title_return()
@@ -998,7 +982,6 @@ func _resume_from_suspend(data: SuspendData) -> void:
 	clear_flags = data.clear_flags.duplicate(true)
 	achievement_counters = data.achievement_counters.duplicate(true)
 	active_slot = data.active_slot
-	checkpoint_valid = data.checkpoint_valid
 	load_stage(data.stage_id, true)
 	if not data.apply_to(tm):
 		return

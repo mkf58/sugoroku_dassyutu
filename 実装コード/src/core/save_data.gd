@@ -59,3 +59,28 @@ static func from_dict(data: Dictionary) -> SaveData:
     d.achievement_counters = Dictionary(ach.get("counters", {})).duplicate(true)
     return d
 
+## 「はじめから」用：ステージ1開始状態の初期セーブデータ
+static func new_game(first_stage_id: String) -> SaveData:
+    var d = SaveData.new()
+    d.saved_at = Time.get_datetime_string_from_system(false, true)
+    d.next_stage_id = first_stage_id
+    d.cleared_stage_name = ""
+    d.inventory = initial_inventory()
+    return d
+
+## ゲーム開始時の所持品（1の賽）
+static func initial_inventory() -> Array[Dictionary]:
+    var inv: Array[Dictionary] = []
+    inv.append({
+        "id": "DICE_1_INIT",
+        "name": "1の賽",
+        "desc": "出目が必ず【1】になる固定ダイス",
+        "value": 1,
+        "type": "FIXED_DICE",
+        "icon_text": "🎲",
+    })
+    return inv
+
+## まだ1ステージもクリアしていない開始前セーブか
+func is_initial() -> bool:
+    return cleared_stage_name.is_empty()
