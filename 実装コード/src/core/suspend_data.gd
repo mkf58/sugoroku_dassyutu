@@ -19,7 +19,6 @@ var progress_flags: Dictionary = {}
 var clear_flags: Dictionary = {}
 var achievement_counters: Dictionary = {}
 var active_slot: int = 1              ## オートセーブ先スロット
-var checkpoint_valid: bool = false    ## リトライ時にスロットから復帰できるか
 
 ## TurnManager の現在状態を取り込む。fresh_board は同ステージの初期盤面（差分検出用）。
 static func capture(tm: TurnManager, fresh_board: GridBoard) -> SuspendData:
@@ -112,7 +111,6 @@ func to_dict() -> Dictionary:
         },
         "achievements": {"counters": achievement_counters.duplicate(true)},
         "active_slot": active_slot,
-        "checkpoint_valid": checkpoint_valid,
     }
 
 static func from_dict(data: Dictionary) -> SuspendData:
@@ -143,6 +141,5 @@ static func from_dict(data: Dictionary) -> SuspendData:
     s.clear_flags = Dictionary(story.get("clear_flags", {})).duplicate(true)
     s.achievement_counters = Dictionary(Dictionary(data.get("achievements", {})).get("counters", {})).duplicate(true)
     s.active_slot = int(data.get("active_slot", 1))
-    s.checkpoint_valid = bool(data.get("checkpoint_valid", false))
     return s
 

@@ -20,7 +20,8 @@ func run_all() -> void:
     test_load_version_mismatch()
     test_delete_slot()
     test_has_any_save_and_latest()
-    test_pick_new_game_slot()
+    test_new_game_data()
+    test_new_game_overwrites_slot()
     test_summaries()
     _cleanup()
 
@@ -154,16 +155,33 @@ func test_has_any_save_and_latest() -> void:
     assert_eq(SaveManager.latest_slot(TEST_DIR), 1, "UT-SAVE-N06: 最新日時のスロット")
     _cleanup()
 
-## UT-SAVE-D01: はじめから開始時の使用スロット（空き優先、全使用なら1）
-func test_pick_new_game_slot() -> void:
-    assert_eq(SaveManager.pick_new_game_slot(TEST_DIR), 1, "UT-SAVE-D01: 全空きなら1")
-    SaveManager.save_slot(1, _make_data(), TEST_DIR)
-    assert_eq(SaveManager.pick_new_game_slot(TEST_DIR), 2, "UT-SAVE-D01: 1使用中なら2")
-    SaveManager.save_slot(2, _make_data(), TEST_DIR)
-    SaveManager.save_slot(3, _make_data(), TEST_DIR)
-    assert_eq(SaveManager.pick_new_game_slot(TEST_DIR), 1, "UT-SAVE-D01: 全使用なら1（上書き）")
-    _cleanup()
+## UT-SAVE-N08: 「はじめから」用の初期セーブデータ（ステージ1開始状態）
+func test_new_game_data() -> void:
+    var d = SaveData.new_game("STAGE_1")
+    assert_eq(d.next_stage_id, "STAGE_1", "UT-SAVE-N08: 開始ステージ")
+    assert_eq(d.cleared_stage_name, "", "UT-SAVE-N08: クリア済みステージ名は空")
+    assert_true(d.is_initial(), "UT-SAVE-N08: 開始前セーブと判定される")
+    assert_eq(d.inventory.size(), 1, "UT-SAVE-N08: 初期所持品は1件")
+    assert_eq(d.inventory[0].get("value"), 1, "UT-SAVE-N08: 初期所持品は1の賽")
+    assert_false(d.saved_at.is_empty(), "UT-SAVE-N08: セーブ日時が入る")
+    assert_true(d.visited_event_ids.is_empty() and d.clear_flags.is_empty(), "UT-SAVE-N08: 進行状態は空")
+    var cleared = _make_data()
+    assert_false(cleared.is_initial(), "UT-SAVE-N08: クリア後データは開始前ではない")
+    var r = SaveData.from_dict(JSON.parse_string(JSON.stringify(d.to_dict())))
+    assert_not_null(r, "UT-SAVE-N08: JSON経由で復元可能")
+    assert_true(r.is_initial(), "UT-SAVE-N08: 復元後も開始前判定")
 
+## UT-SAVE-D01: 使用済みスロットへの「はじめから」は初期セーブで上書きされ、空きスロットには新規作成される
+func test_new_game_overwrites_slot() -> void:
+    SaveManager.save_slot(2, _make_data(), TEST_DIR)
+    assert_true(SaveManager.save_slot(2, SaveData.new_game("STAGE_1"), TEST_DIR), "UT-SAVE-D01: 上書き保存成功")
+    var r = SaveManager.load_slot(2, TEST_DIR)
+    assert_eq(r.next_stage_id, "STAGE_1", "UT-SAVE-D01: 上書き後は開始ステージ")
+    assert_eq(r.inventory.size(), 1, "UT-SAVE-D01: 旧所持品は残らない")
+    assert_false(SaveManager.has_slot(1, TEST_DIR), "UT-SAVE-D01: 他スロットは影響を受けない")
+    assert_true(SaveManager.save_slot(1, SaveData.new_game("STAGE_1"), TEST_DIR), "UT-SAVE-D01: 空きスロットへ新規作成")
+    assert_true(SaveManager.has_slot(1, TEST_DIR), "UT-SAVE-D01: 新規作成後は存在")
+    _cleanup()
 ## UT-SAVE-N07: スロット一覧サマリ（空スロットはnull）
 func test_summaries() -> void:
     SaveManager.save_slot(2, _make_data(), TEST_DIR)
