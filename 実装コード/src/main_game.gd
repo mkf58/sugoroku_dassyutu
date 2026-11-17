@@ -28,6 +28,13 @@ var inventory: Array[Dictionary] = []
 var current_stage_data: StageData = null
 var current_acting_unit_id: String = "HERO"
 
+# セーブ対象のステージ間引き継ぎ状態（inventory と併せて保存される）
+var active_slot: int = 1
+var visited_event_ids: Array = []
+var progress_flags: Dictionary = {}
+var clear_flags: Dictionary = {}
+var achievement_counters: Dictionary = {}
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -66,9 +73,39 @@ func _get_enemy_obstacles() -> Array[Vector2i]:
 func _ready() -> void:
 	_bind_events()
 	var start_id = "STAGE_1"
-	if get_node_or_null("/root/SceneManager"):
-		start_id = get_node("/root/SceneManager").get_param("stage_id", "STAGE_1")
-	load_stage(start_id, false)
+	var resume: SaveData = null
+	var sm = get_node_or_null("/root/SceneManager")
+	if sm:
+		start_id = sm.get_param("stage_id", "STAGE_1")
+		active_slot = int(sm.get_param("active_slot", 1))
+		resume = sm.get_param("resume_save", null)
+		sm.set_param("resume_save", null)
+	if resume != null:
+		_apply_save_data(resume)
+		load_stage(resume.next_stage_id, true)
+	else:
+		load_stage(start_id, false)
+
+## セーブデータの内容を引き継ぎ状態へ反映する
+func _apply_save_data(data: SaveData) -> void:
+	inventory = data.inventory.duplicate(true)
+	visited_event_ids = data.visited_event_ids.duplicate()
+	progress_flags = data.progress_flags.duplicate(true)
+	clear_flags = data.clear_flags.duplicate(true)
+	achievement_counters = data.achievement_counters.duplicate(true)
+
+## 現在の引き継ぎ状態からセーブデータを生成する（ステージクリア時用）
+func _build_save_data() -> SaveData:
+	var data = SaveData.new()
+	data.saved_at = Time.get_datetime_string_from_system(false, true)
+	data.next_stage_id = current_stage_data.next_stage_id if current_stage_data else ""
+	data.cleared_stage_name = current_stage_data.stage_name if current_stage_data else ""
+	data.inventory = inventory.duplicate(true)
+	data.visited_event_ids = visited_event_ids.duplicate()
+	data.progress_flags = progress_flags.duplicate(true)
+	data.clear_flags = clear_flags.duplicate(true)
+	data.achievement_counters = achievement_counters.duplicate(true)
+	return data
 
 func _init_poc_stage(preserve_inventory: bool = false) -> void:
 	load_stage("STAGE_1", preserve_inventory)
@@ -195,9 +232,15 @@ func _bind_turn_manager_events() -> void:
 		hud.update_turn_info(tm.current_turn, "脱出成功！ステージクリア！")
 		hud.set_action_buttons_enabled(false)
 		hud.log_message("[CLEAR] EXITマスに到達！館からの脱出に成功しました！")
-		if get_node_or_null("/root/SceneManager"):
-			get_node("/root/SceneManager").set_param("has_cleared_stage", true)
 		var has_next = current_stage_data != null and not current_stage_data.next_stage_id.is_empty()
+		if current_stage_data:
+			clear_flags[current_stage_data.stage_id] = true
+		# ステージクリア時のオートセーブ（次ステージが存在する場合のみ）
+		if has_next:
+			if SaveManager.save_slot(active_slot, _build_save_data()):
+				hud.log_message("[Save] スロット%dにオートセーブしました。" % active_slot)
+			else:
+				hud.log_message("[Save] オートセーブに失敗しました。")
 		var s_name = current_stage_data.stage_name if current_stage_data else ""
 		stage_clear_screen.show_clear(tm.current_turn, s_name, has_next)
 	)
@@ -435,6 +478,11 @@ func _on_item_used(item_id: String) -> void:
 	DebugLogger.info("MainGame._on_item_used", "アイテム使用完了: " + str(used_item.get("name", "")))
 
 func _handle_cell_event(cell_data: CellData) -> void:
+	# 踏んだイベントマスを記録（セーブ対象）
+	var stage_key = current_stage_data.stage_id if current_stage_data else ""
+	var ev_key = cell_data.event_id if not cell_data.event_id.is_empty() else "%s_%d_%d" % [stage_key, cell_data.coord.x, cell_data.coord.y]
+	if not visited_event_ids.has(ev_key):
+		visited_event_ids.append(ev_key)
 	# 宝箱マスでランダムな固定ダイスを獲得
 	var random_val = randi_range(1, 6)
 	var item_data = {

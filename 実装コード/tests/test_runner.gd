@@ -8,6 +8,7 @@ const TestTurnLifecycle = preload("res://tests/test_turn_lifecycle.gd")
 const TestInventoryItems = preload("res://tests/test_inventory_items.gd")
 const TestSceneManager = preload("res://tests/test_scene_manager.gd")
 const TestStageSystem = preload("res://tests/test_stage_system.gd")
+const TestSaveSystem = preload("res://tests/test_save_system.gd")
 
 func _init() -> void:
 	print("========================================")
@@ -22,7 +23,8 @@ func _init() -> void:
 		{"name": "UT-TURN", "instance": TestTurnLifecycle.new()},
 		{"name": "UT-ITEM", "instance": TestInventoryItems.new()},
 		{"name": "UT-SCENE", "instance": TestSceneManager.new()},
-		{"name": "UT-STAGE", "instance": TestStageSystem.new()}
+		{"name": "UT-STAGE", "instance": TestStageSystem.new()},
+		{"name": "UT-SAVE", "instance": TestSaveSystem.new()}
 	]
 
 	

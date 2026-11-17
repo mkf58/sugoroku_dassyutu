@@ -116,6 +116,6 @@ func set_param(key: String, value: Variant) -> void:
 func get_param(key: String, default_value: Variant = null) -> Variant:
     return scene_params.get(key, default_value)
 
-## セーブデータ簡易判定（PoC用）
+## いずれかのスロットにセーブデータが存在するか
 func has_save_data() -> bool:
-    return scene_params.has("has_cleared_stage") or FileAccess.file_exists("user://save_data.json")
+    return SaveManager.has_any_save()
