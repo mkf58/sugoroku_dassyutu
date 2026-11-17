@@ -25,7 +25,6 @@ var pending_additional_steps: int = 0
 var has_pending_additional_move: bool = false
 var has_pending_roll_again: bool = false
 var inventory: Array[Dictionary] = []
-var stage_start_inventory: Array[Dictionary] = []
 var current_stage_data: StageData = null
 var current_acting_unit_id: String = "HERO"
 
@@ -35,6 +34,9 @@ var visited_event_ids: Array = []
 var progress_flags: Dictionary = {}
 var clear_flags: Dictionary = {}
 var achievement_counters: Dictionary = {}
+var checkpoint_valid: bool = false  # true: リトライ時に active_slot のセーブから復帰できる
+var is_enemy_turn: bool = false
+var suspend_btn: Button = null
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -73,20 +75,49 @@ func _get_enemy_obstacles() -> Array[Vector2i]:
 
 func _ready() -> void:
 	_bind_events()
+	_create_suspend_button()
 	var start_id = "STAGE_1"
 	var resume: SaveData = null
+	var suspend: SuspendData = null
 	var sm = get_node_or_null("/root/SceneManager")
 	if sm:
 		start_id = sm.get_param("stage_id", "STAGE_1")
 		active_slot = int(sm.get_param("active_slot", 1))
 		resume = sm.get_param("resume_save", null)
+		suspend = sm.get_param("resume_suspend", null)
 		sm.set_param("resume_save", null)
-	if resume != null:
+		sm.set_param("resume_suspend", null)
+	if suspend != null:
+		_resume_from_suspend(suspend)
+	elif resume != null:
 		_apply_save_data(resume)
+		checkpoint_valid = true
 		load_stage(resume.next_stage_id, true)
 	else:
+		_reset_progress()
 		load_stage(start_id, false)
 
+## 新規ゲーム開始時：引き継ぎ状態を初期化する
+func _reset_progress() -> void:
+	visited_event_ids.clear()
+	progress_flags.clear()
+	clear_flags.clear()
+	achievement_counters.clear()
+	checkpoint_valid = false
+
+## セーブ（チェックポイント）へ戻ってステージをやり直す。セーブが無ければ最初から。
+func _restore_checkpoint_or_restart() -> void:
+	var data: SaveData = null
+	if checkpoint_valid:
+		data = SaveManager.load_slot(active_slot)
+	if data != null:
+		_apply_save_data(data)
+		hud.log_message("[Load] スロット%dのセーブから再開します。" % active_slot)
+		load_stage(data.next_stage_id, true)
+	else:
+		hud.log_message("[Retry] セーブが無いため最初からやり直します。")
+		_reset_progress()
+		load_stage("STAGE_1", false)
 ## セーブデータの内容を引き継ぎ状態へ反映する
 func _apply_save_data(data: SaveData) -> void:
 	inventory = data.inventory.duplicate(true)
@@ -139,9 +170,6 @@ func load_stage(stage_id: String, preserve_inventory: bool = false) -> void:
 			"type": "FIXED_DICE",
 			"icon_text": "🎲"
 		})
-
-	# ステージ開始時点の所持品を記録（リトライ時はここへ戻し、所持品を失わない）
-	stage_start_inventory = inventory.duplicate(true)
 
 	tm = TurnManager.new()
 	_bind_turn_manager_events()
@@ -242,6 +270,7 @@ func _bind_turn_manager_events() -> void:
 		# ステージクリア時のオートセーブ（次ステージが存在する場合のみ）
 		if has_next:
 			if SaveManager.save_slot(active_slot, _build_save_data()):
+				checkpoint_valid = true
 				hud.log_message("[Save] スロット%dにオートセーブしました。" % active_slot)
 			else:
 				hud.log_message("[Save] オートセーブに失敗しました。")
@@ -292,6 +321,7 @@ func _bind_turn_manager_events() -> void:
 
 
 func _start_player_turn_flow() -> void:
+	is_enemy_turn = false
 	tm.start_player_turn()
 	current_dice_roll = 0
 	reachable_cells.clear()
@@ -763,6 +793,7 @@ func _on_unit_action_finished(unit_id: String) -> void:
 
 
 func _advance_to_enemy_turn() -> void:
+	is_enemy_turn = true
 	hud.set_action_buttons_enabled(false)
 	hud.update_turn_info(tm.current_turn, "魔女の行動中...")
 	hud.log_message("[Enemy] 魔女のターン開始。思考中...")
@@ -883,12 +914,8 @@ func _on_retry() -> void:
 	action_command_menu.visible = false
 	item_select_modal.visible = false
 	hud.set_action_buttons_enabled(true)
-	hud.log_message("[Retry] このステージを最初からやり直します。")
-	var current_id = current_stage_data.stage_id if current_stage_data else "STAGE_1"
-	# 所持品はステージ開始時点の状態へ戻して引き継ぐ（失わない）
-	inventory = stage_start_inventory.duplicate(true)
-	load_stage(current_id, true)
-
+	# ゲームオーバー後は、セーブ（無ければ最初）から始め直す。タイトルへ戻った場合も「つづきから」で同じ状態になる
+	_restore_checkpoint_or_restart()
 func _on_stage_clear_retry() -> void:
 	game_over_screen.visible = false
 	stage_clear_screen.visible = false
@@ -902,12 +929,95 @@ func _on_stage_clear_retry() -> void:
 		load_stage(current_stage_data.next_stage_id, true)
 	else:
 		hud.log_message("[Clear Finish] 全階層脱出完了！最初からやり直します。")
+		_reset_progress()
 		load_stage("STAGE_1", false)
 
 func _on_title_return() -> void:
-
 	DebugLogger.info("MainGame._on_title_return", "タイトル画面へ遷移します")
 	if get_node_or_null("/root/SceneManager"):
 		get_node("/root/SceneManager").change_to_title()
 	else:
 		get_tree().change_scene_to_file("res://scenes/title_screen.tscn")
+
+
+# ===== 中断セーブ（一時離席用・ロードすると消える） =====
+
+func _create_suspend_button() -> void:
+	var top_bar = hud.get_node_or_null("TopBar")
+	if top_bar == null:
+		return
+	suspend_btn = Button.new()
+	suspend_btn.text = "中断セーブ"
+	suspend_btn.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	suspend_btn.anchor_top = 0.5
+	suspend_btn.anchor_bottom = 0.5
+	suspend_btn.offset_left = -240.0
+	suspend_btn.offset_right = -130.0
+	suspend_btn.offset_top = -18.0
+	suspend_btn.offset_bottom = 18.0
+	suspend_btn.focus_mode = Control.FOCUS_NONE
+	suspend_btn.pressed.connect(_on_suspend_pressed)
+	top_bar.add_child(suspend_btn)
+
+## 中断セーブ可能か：プレイヤーの行動選択待ち中のみ（移動中・魔女ターン・演出中は不可）
+func _can_suspend_save() -> bool:
+	if tm == null or is_moving or is_enemy_turn:
+		return false
+	if tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
+		return false
+	if current_dice_roll > 0 or has_pending_additional_move or has_pending_roll_again:
+		return false
+	if game_over_screen.visible or stage_clear_screen.visible or item_select_modal.visible:
+		return false
+	return true
+
+func _on_suspend_pressed() -> void:
+	if not _can_suspend_save():
+		hud.log_message("[Suspend] 今は中断セーブできません（行動選択待ちのときのみ可能）。")
+		return
+	var fresh = StageRepository.get_stage(tm.stage_id)
+	var data = SuspendData.capture(tm, fresh.board if fresh else null)
+	data.inventory = inventory.duplicate(true)
+	data.visited_event_ids = visited_event_ids.duplicate()
+	data.progress_flags = progress_flags.duplicate(true)
+	data.clear_flags = clear_flags.duplicate(true)
+	data.achievement_counters = achievement_counters.duplicate(true)
+	data.active_slot = active_slot
+	data.checkpoint_valid = checkpoint_valid
+	if SaveManager.save_suspend(data):
+		hud.log_message("[Suspend] 中断セーブしました。タイトルへ戻ります。")
+		_on_title_return()
+	else:
+		hud.log_message("[Suspend] 中断セーブに失敗しました。")
+
+## 中断データから再開する（ステージを初期状態で構築→保存状態を上書き）
+func _resume_from_suspend(data: SuspendData) -> void:
+	inventory = data.inventory.duplicate(true)
+	visited_event_ids = data.visited_event_ids.duplicate()
+	progress_flags = data.progress_flags.duplicate(true)
+	clear_flags = data.clear_flags.duplicate(true)
+	achievement_counters = data.achievement_counters.duplicate(true)
+	active_slot = data.active_slot
+	checkpoint_valid = data.checkpoint_valid
+	load_stage(data.stage_id, true)
+	if not data.apply_to(tm):
+		return
+	# 盤面表示（マス・ピース）を保存状態へ同期
+	for o in data.cell_overrides:
+		var coord = Vector2i(int(o["coord"][0]), int(o["coord"][1]))
+		if board_view.cell_nodes.has(coord):
+			board_view.cell_nodes[coord].update_visual()
+	for c in tm.characters.values():
+		var cp = board_view.get_piece(c.character_id)
+		if cp:
+			cp.position = Vector2(c.current_coord.x * 64 + 16, c.current_coord.y * 64 + 16)
+			cp.visible = c.is_alive
+			cp.set_burrowed(c.is_burrowed)
+	for e in tm.enemies.values():
+		var ep = board_view.get_piece(e.enemy_id)
+		if ep:
+			ep.position = Vector2(e.current_coord.x * 64 + 16, e.current_coord.y * 64 + 16)
+			ep.visible = e.is_alive
+	hud.log_message("[Resume] 中断データから再開します（ターン%d）。" % tm.current_turn)
+	# 保存時点の行動済み状態を保ったまま、次の行動ユニットを選び直す
+	_start_next_player_action()

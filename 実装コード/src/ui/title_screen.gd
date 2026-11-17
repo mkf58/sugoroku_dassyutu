@@ -79,6 +79,18 @@ func _open_slot_select() -> void:
 			btn.text = "スロット%d：%s クリア → 次: %s\n%s" % [slot_no, d.cleared_stage_name, d.next_stage_id, d.saved_at]
 			btn.pressed.connect(_on_slot_selected.bind(slot_no))
 		box.add_child(btn)
+	# 中断データ（一時離席用・ロードすると消える）
+	if SaveManager.has_suspend():
+		var sd = SaveManager.load_suspend()
+		var sbtn = Button.new()
+		sbtn.custom_minimum_size = Vector2(0, 56)
+		if sd != null:
+			sbtn.text = "中断データ：%s ターン%d（ロードすると消えます）\n%s" % [sd.stage_id, sd.current_turn, sd.saved_at]
+			sbtn.pressed.connect(_on_suspend_selected)
+		else:
+			sbtn.text = "中断データ：（読込不可）"
+			sbtn.disabled = true
+		box.add_child(sbtn)
 	var cancel = Button.new()
 	cancel.text = "戻る"
 	cancel.pressed.connect(_close_slot_select)
@@ -91,7 +103,8 @@ func _close_slot_select() -> void:
 		slot_overlay = null
 
 func _on_slot_selected(slot_no: int) -> void:
-	var data = SaveManager.load_slot(slot_no)
+	# どのスロットをロードしても中断データは消える
+	var data = SaveManager.load_slot_and_clear_suspend(slot_no)
 	if data == null:
 		DebugLogger.error("TitleScreen._on_slot_selected", "セーブデータの読込に失敗しました: slot=%d" % slot_no)
 		_close_slot_select()
@@ -111,3 +124,19 @@ func _on_help_pressed() -> void:
 func _on_quit_pressed() -> void:
 	DebugLogger.info("TitleScreen._on_quit_pressed", "ゲームを終了します")
 	get_tree().quit()
+
+
+## 中断データからの再開（読み込むと中断データは消える）
+func _on_suspend_selected() -> void:
+	var data = SaveManager.consume_suspend()
+	if data == null:
+		DebugLogger.error("TitleScreen._on_suspend_selected", "中断データの読込に失敗しました")
+		_close_slot_select()
+		return
+	var sm = get_node_or_null("/root/SceneManager")
+	if sm:
+		sm.set_param("resume_suspend", data)
+		sm.set_param("resume_save", null)
+		sm.change_to_main_game(data.stage_id)
+	else:
+		get_tree().change_scene_to_file("res://scenes/main_game.tscn")

@@ -116,6 +116,6 @@ func set_param(key: String, value: Variant) -> void:
 func get_param(key: String, default_value: Variant = null) -> Variant:
     return scene_params.get(key, default_value)
 
-## いずれかのスロットにセーブデータが存在するか
+## いずれかのスロット、または中断データが存在するか
 func has_save_data() -> bool:
-    return SaveManager.has_any_save()
+    return SaveManager.has_any_save() or SaveManager.has_suspend()
