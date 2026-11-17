@@ -25,6 +25,7 @@ var pending_additional_steps: int = 0
 var has_pending_additional_move: bool = false
 var has_pending_roll_again: bool = false
 var inventory: Array[Dictionary] = []
+var stage_start_inventory: Array[Dictionary] = []
 var current_stage_data: StageData = null
 var current_acting_unit_id: String = "HERO"
 
@@ -138,6 +139,9 @@ func load_stage(stage_id: String, preserve_inventory: bool = false) -> void:
 			"type": "FIXED_DICE",
 			"icon_text": "🎲"
 		})
+
+	# ステージ開始時点の所持品を記録（リトライ時はここへ戻し、所持品を失わない）
+	stage_start_inventory = inventory.duplicate(true)
 
 	tm = TurnManager.new()
 	_bind_turn_manager_events()
@@ -881,7 +885,9 @@ func _on_retry() -> void:
 	hud.set_action_buttons_enabled(true)
 	hud.log_message("[Retry] このステージを最初からやり直します。")
 	var current_id = current_stage_data.stage_id if current_stage_data else "STAGE_1"
-	load_stage(current_id, false)
+	# 所持品はステージ開始時点の状態へ戻して引き継ぐ（失わない）
+	inventory = stage_start_inventory.duplicate(true)
+	load_stage(current_id, true)
 
 func _on_stage_clear_retry() -> void:
 	game_over_screen.visible = false

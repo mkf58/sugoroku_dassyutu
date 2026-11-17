@@ -58,3 +58,4 @@ static func from_dict(data: Dictionary) -> SaveData:
     var ach: Dictionary = data.get("achievements", {})
     d.achievement_counters = Dictionary(ach.get("counters", {})).duplicate(true)
     return d
+
