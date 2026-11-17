@@ -177,3 +177,22 @@
 | **正常系** | **UT-STAGE-N04** | `test_all_units_placed_on_valid_cells` | 全6ステージの主人公・少女・魔女の初期配置座標を検証 | 全ユニットの初期座標が盤面上（`board.has_cell == true`）に存在すること |
 
 
+
+
+## UT-SAVE：セーブ・ロードシステム（`test_save_system.gd`）
+| ID | 観点 | 内容 |
+| --- | --- | --- |
+| UT-SAVE-N01 | N | SaveData の辞書変換が可逆 |
+| UT-SAVE-N02 | N | 新規 SaveData の初期値（拡張枠は空） |
+| UT-SAVE-N03 | N | JSON 経由（float化）でもアイテム値が int で復元 |
+| UT-SAVE-N04 | N | スロット保存・読込 |
+| UT-SAVE-N05 | N | スロット削除（二重削除は false） |
+| UT-SAVE-N06 | N | セーブ有無・最新スロット判定 |
+| UT-SAVE-N07 | N | スロット一覧（常に3件、空きは null） |
+| UT-SAVE-E01 | E | 不正な辞書からの復元は null |
+| UT-SAVE-E02 | E | 未保存スロットの読込は null |
+| UT-SAVE-E03 | E | 破損ファイルの読込は null |
+| UT-SAVE-E04 | E | 未来バージョンのデータは読込拒否 |
+| UT-SAVE-B01 | B | スロット境界（1・3 は有効、スロット数は3） |
+| UT-SAVE-B02 | B | 範囲外スロット（0・4・-1）と null データは拒否 |
+| UT-SAVE-D01 | D | はじめから開始時の使用スロット（空き優先、全使用なら1） |
