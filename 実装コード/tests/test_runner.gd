@@ -9,6 +9,7 @@ const TestInventoryItems = preload("res://tests/test_inventory_items.gd")
 const TestSceneManager = preload("res://tests/test_scene_manager.gd")
 const TestStageSystem = preload("res://tests/test_stage_system.gd")
 const TestSaveSystem = preload("res://tests/test_save_system.gd")
+const TestSuspendSystem = preload("res://tests/test_suspend_system.gd")
 
 func _init() -> void:
 	print("========================================")
@@ -24,7 +25,8 @@ func _init() -> void:
 		{"name": "UT-ITEM", "instance": TestInventoryItems.new()},
 		{"name": "UT-SCENE", "instance": TestSceneManager.new()},
 		{"name": "UT-STAGE", "instance": TestStageSystem.new()},
-		{"name": "UT-SAVE", "instance": TestSaveSystem.new()}
+		{"name": "UT-SAVE", "instance": TestSaveSystem.new()},
+		{"name": "UT-SUSP", "instance": TestSuspendSystem.new()}
 	]
 
 	

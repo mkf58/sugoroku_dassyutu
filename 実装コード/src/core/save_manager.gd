@@ -88,3 +88,61 @@ static func pick_new_game_slot(dir: String = SAVE_DIR) -> int:
             return s
     return 1
 
+## ===== 中断セーブ（一時離席用・1枠・ロードすると消える） =====
+const SUSPEND_FILE: String = "suspend.json"
+
+static func suspend_path(dir: String = SAVE_DIR) -> String:
+    return "%s/%s" % [dir, SUSPEND_FILE]
+
+static func has_suspend(dir: String = SAVE_DIR) -> bool:
+    return FileAccess.file_exists(suspend_path(dir))
+
+## 保存（既存の中断データは上書きされる）
+static func save_suspend(data: SuspendData, dir: String = SAVE_DIR) -> bool:
+    if data == null:
+        return false
+    DirAccess.make_dir_recursive_absolute(dir)
+    var f = FileAccess.open(suspend_path(dir), FileAccess.WRITE)
+    if f == null:
+        DebugLogger.error("SaveManager.save_suspend", "ファイルを開けません: %s" % suspend_path(dir))
+        return false
+    f.store_string(JSON.stringify(data.to_dict(), "  "))
+    f.close()
+    return true
+
+## 読込のみ（消さない）。未保存・破損・未対応バージョンはnull。
+static func load_suspend(dir: String = SAVE_DIR) -> SuspendData:
+    if not has_suspend(dir):
+        return null
+    var f = FileAccess.open(suspend_path(dir), FileAccess.READ)
+    if f == null:
+        return null
+    var text = f.get_as_text()
+    f.close()
+    var parsed = JSON.parse_string(text)
+    if not (parsed is Dictionary):
+        DebugLogger.warn("SaveManager.load_suspend", "中断データが破損しています")
+        return null
+    var data = SuspendData.from_dict(parsed)
+    if data == null or data.version > SuspendData.CURRENT_VERSION:
+        return null
+    return data
+
+static func delete_suspend(dir: String = SAVE_DIR) -> bool:
+    if not has_suspend(dir):
+        return false
+    return DirAccess.remove_absolute(suspend_path(dir)) == OK
+
+## 中断データを読み込み、同時に削除する（ロードすると消える）
+static func consume_suspend(dir: String = SAVE_DIR) -> SuspendData:
+    var data = load_suspend(dir)
+    if data != null:
+        delete_suspend(dir)
+    return data
+
+## 通常スロットのロード。成功した場合は中断データも消す（どのデータをロードしても消える）。
+static func load_slot_and_clear_suspend(slot: int, dir: String = SAVE_DIR) -> SaveData:
+    var data = load_slot(slot, dir)
+    if data != null:
+        delete_suspend(dir)
+    return data
