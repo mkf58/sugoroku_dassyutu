@@ -87,3 +87,4 @@ static func pick_new_game_slot(dir: String = SAVE_DIR) -> int:
         if not has_slot(s, dir):
             return s
     return 1
+
