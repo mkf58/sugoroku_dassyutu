@@ -145,3 +145,4 @@ static func from_dict(data: Dictionary) -> SuspendData:
     s.active_slot = int(data.get("active_slot", 1))
     s.checkpoint_valid = bool(data.get("checkpoint_valid", false))
     return s
+
