@@ -320,3 +320,11 @@ c. いいですよ．スキル通り，テストの修正時はこちらに提�
 
 **[Agent] 対応**
 - `.claude/settings.json` を CLAUDE.md の記載どおりの内容で作成（`feature/claude-settings` ブランチ）。
+
+### Q92. [Agent] `/newplan` で `.spec/plan/` も一緒に退避するか
+**[Agent]** `/newplan`（新しい開発サイクルの開始）は PLAN.md だけを `PLAN-YYYY-MM-DD.md` にリネームする手順になっている。フェーズ分割で作った `.spec/plan/` も一緒に退避する手順を加えるか？
+
+**A92. [User]** 終わったフェーズの別バージョンを取る意味が薄いので、一緒に退避しなくてよい。
+
+**[Agent] 対応**
+- `/newplan` の手順は変更しない。`.spec/plan/` は新しいサイクルでもそのまま残し、フェーズ番号を続けて使う。
