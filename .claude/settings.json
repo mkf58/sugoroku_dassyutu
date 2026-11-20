@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "autoMemoryEnabled": false,
+  "permissions": {
+    "allow": [
+      "Edit(/**)",
+      "Bash(git *)",
+      "PowerShell(git *)",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File .\run_tests.ps1)",
+      "Bash(powershell -ExecutionPolicy Bypass -File ./run_tests.ps1)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "PowerShell(git push --force*)",
+      "PowerShell(git push -f*)",
+      "PowerShell(git push * --force*)",
+      "PowerShell(git push * -f*)"
+    ]
+  }
+}
