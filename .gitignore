@@ -16,3 +16,6 @@ dist-ssr
 
 # Godot 4
 **/.godot/
+
+# Claude Code (personal overrides)
+.claude/settings.local.json
