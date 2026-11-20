@@ -1,18 +1,16 @@
 ﻿# 実行結果サマリー
 
 ## 実施内容
-1. **`.claude/settings.json` の作成（Claude Code 最適化の続き）：**
-   - CLAUDE.md に「設定済み」と書かれていた権限設定が実在しなかったため、ユーザー確認（PLAN.md Q91）のうえ作成。
-   - allow：`Edit(/**)`、`git`（Bash / PowerShell）、`run_tests.ps1` の実行。
-   - deny：`git push --force` / `-f`（Bash / PowerShell）。
-   - `autoMemoryEnabled: false` でローカル自動メモリを無効化。
-2. **ローカル自動テスト：** `run_tests.ps1` で TOTAL PASSED: 348 / TOTAL FAILED: 0 を確認。
+1. **PLAN.md のフェーズ別分割：**
+   - 完了したフェーズのQAを `.spec/plan/` に分けた：01_要件定義（Q1〜Q38）、02_基本設計（Q39〜Q53）、03_詳細設計_PoC実装（Q54〜Q71）、04_CI_テスト基盤（Q72〜Q80）。中身は分割前のまま。
+   - PLAN.md 本体には「1. 提案」、過去フェーズの索引表、現行フェーズ（5. 機能実装、Q81〜）のQAだけを残した（2552行 → 322行）。
+   - CLAUDE.md の PLAN.md の読み方・追記ルールを新しい構成に合わせて更新。
+2. **ローカル自動テスト：** TOTAL PASSED: 348 / TOTAL FAILED: 0。dev マージ後に実行したもので、マージ前ではない（ドキュメントのみの変更）。
 
 ## プッシュしたブランチ
-- 作業用ブランチ：`feature/claude-settings`
+- 作業用ブランチ：`feature/plan-phase-split`
 - 開発統合ブランチ：`dev`
 
 ## 次に行うべき提案（ユーザーへのメッセージ）
-- 権限設定は Claude Code の再起動後に反映されます。
-- `.spec/PLAN.md` が2500行を超えているため、Q1〜Q80 程度を `.spec/PLAN_archive.md` に分けるとさらに読み込みが軽くなります（必要なら指示してください）。
-- 次の開発作業は、TODO の最優先事項「設置した水罠関連のバグ調査・修正」です。
+- `/newplan`（新しい開発サイクルの開始）は今も PLAN.md だけをリネームする手順のままです。`.spec/plan/` も一緒に退避する手順を加えるか、決めてください。
+- 次の開発作業は、TODO の最優先事項「設置した水罠のバグ調査・修正」です。
