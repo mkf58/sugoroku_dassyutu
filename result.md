@@ -1,16 +1,18 @@
 ﻿# 実行結果サマリー
 
 ## 実施内容
-1. **セーブ・ロードシステムおよび中断セーブの実装・実機確認完了：**
-   - 3スロット管理、「はじめから」でのスロット選択＆初期セーブ即作成（上書き確認付き）、ステージクリア時のオートセーブ、一時離席用の中断セーブ（1枠・ロードで消滅）、ゲームオーバー後のリトライ＝セーブからの再開統一を実装し、実機での動作確認が完了しました。
-   - ローカル自動テスト（`run_tests.ps1`）にて **全10スイート TOTAL PASSED: 348 / TOTAL FAILED: 0（全348項目100%合格）** を確認済みです。
-2. **次回TODO・引き継ぎの記録（`TODO.md`, `HANDOFF.md`, `PLAN.md`）：**
-   - 実機確認で見つかった**「設置した水罠（水魔術トラップ）関連のバグ調査・修正」**を次回最優先タスクとして記録しました。
+1. **Claude Code 向けプロジェクト最適化：**
+   - `CLAUDE.md` を拡充。`@AGENTS.md` / `@.agent/memory/MEMORY.md` / `@.agent/handoff/HANDOFF.md` / `@.spec/TODO.md` の @インポートで、セッション開始時に自動で読み込まれるようにした（PLAN.md は2500行超のため、最新QAのみ参照する運用を明記）。
+   - AGENTS.md（Antigravity 前提の用語）と Claude Code の機能の対応表、Windows 実行環境、テスト実行方法、GDScript の注意点を追記。
+   - `.agent/skills/` のスキルを `.claude/skills/spec-to-test/`、`.claude/skills/make_project/` に複製し、Claude Code から使えるようにした。
+   - `.gitignore` に `.claude/settings.local.json` を追加。
+2. **ローカル自動テスト：** `run_tests.ps1` で TOTAL PASSED: 348 / TOTAL FAILED: 0 を確認。
 
 ## プッシュしたブランチ
-- 作業用ブランチ：`feature/new-game-slot-select`
+- 作業用ブランチ：`feature/claude-optimization`
 - 開発統合ブランチ：`dev`
 
 ## 次に行うべき提案（ユーザーへのメッセージ）
-- 本日の作業および引き継ぎ記録はすべて完了し、`dev` ブランチへ反映済みです。
-- 次回セッション開始時に、設置した水罠関連のバグの詳細（どのような操作・タイミングで発生したか）をお知らせいただければ、速やかに調査・修正を行います。本日もお疲れ様でした！
+- 権限の事前許可（`.claude/settings.json`）は、AIが自分の権限を広げる変更にあたるため安全チェックで止まりました。チャットに載せた内容で、ユーザーご自身で作成してください。
+- PowerShell プロファイル（`Microsoft.PowerShell_profile.ps1` の42行目）で文字列の閉じ引用符が抜けており、毎回パースエラーが出ています。
+- 次の開発作業は、TODO の最優先事項「設置した水罠関連のバグ調査・修正」です。
