@@ -2542,3 +2542,11 @@ c. いいですよ．スキル通り，テストの修正時はこちらに提�
 **[Agent] 次回に向けた記録**
 - セーブ・ロードシステム（3スロット、開始時スロット選択＆初期セーブ作成、クリア時オートセーブ、中断セーブ、リトライ時のセーブ復帰統一）の実機動作確認が完了。
 - 次回セッションの最優先事項として、**「設置した水罠（水魔術トラップ）関連のバグ調査・修正」**を `TODO.md` および `HANDOFF.md` に記載済み。次回開始時に具体的な事象（発生状況や挙動）をヒアリング・調査して改修を行う。
+
+### Q91. [Agent] `.claude/settings.json` 未作成の件
+**[Agent]** CLAUDE.md には権限設定（`Edit(/**)`・`git`・`run_tests.ps1` の事前許可、`git push --force/-f` の deny、`autoMemoryEnabled: false`）が「設定済み」と書かれているが、実際には `.claude/settings.json` が存在せず、どれも効いていない。CLAUDE.md の記載どおり作成してよいか？
+
+**A91. [User]** 記載どおり作成する。
+
+**[Agent] 対応**
+- `.claude/settings.json` を CLAUDE.md の記載どおりの内容で作成（`feature/claude-settings` ブランチ）。
