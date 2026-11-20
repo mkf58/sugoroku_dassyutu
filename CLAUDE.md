@@ -11,7 +11,10 @@ AGENTS.md の「セッション開始時（必須）」ファイルのうち、�
 @.agent/handoff/HANDOFF.md
 @.spec/TODO.md
 
-- `.spec/PLAN.md` は2500行超のため自動読み込みしない。セッション開始時は「1. 提案」と、末尾の最新QA（`grep -n "^### Q" .spec/PLAN.md` で位置を確認）のみ Read し、必要に応じて該当Qを参照する。
+- `.spec/PLAN.md` はフェーズごとに分割済み。PLAN.md 本体には「1. 提案」・過去フェーズの索引・現行フェーズのQAだけが入っている。セッション開始時は PLAN.md 本体を Read する（自動読み込みはしない）。
+  - 完了フェーズのQAは `.spec/plan/0N_フェーズ名.md` にアーカイブ済み。過去の決定経緯が必要なときだけ、索引の Q範囲から該当ファイルを Read する。アーカイブは編集しない。
+  - 新しいQAは常に PLAN.md 本体の末尾に、通し番号（最新Qの続き）で追記する。
+  - フェーズが切り替わったら（例：結合テストへ移行）、現行フェーズのQAを `.spec/plan/` の次番号ファイルへ移し、PLAN.md の索引表に1行追加する。
 - `.spec/KNOWLEDGE.md` / `.spec/SPEC.md` は必要時に参照する。
 
 # AGENTS.md の用語と Claude Code の対応
