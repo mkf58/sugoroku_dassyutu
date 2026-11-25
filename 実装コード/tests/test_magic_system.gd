@@ -13,6 +13,10 @@ func run_all() -> void:
 	test_fire_magic_range_boundary()
 	test_earth_magic_burrow_and_stun()
 	test_unburrow_on_movement()
+	test_water_trap_targets_normal_cells_only()
+	test_water_magic_fails_on_special_cell()
+	test_water_magic_fails_on_missing_cell()
+	test_water_magic_range_boundary()
 
 ## UT-MAGIC-N01: 炎魔法による魔女撃破
 func test_fire_magic_defeats_witch() -> void:
@@ -175,3 +179,82 @@ func test_unburrow_on_movement() -> void:
 	var res = tm.step_unit(hero, Vector2i(1, 0), 0)
 	assert_eq(res.get("result"), "ARRIVED", "UT-MAGIC-N05: 到着すること")
 	assert_false(hero.is_burrowed, "UT-MAGIC-N05: 移動完了により潜行解除されること")
+
+## 水魔術テスト用の盤面：(0,0)〜(4,0) の一直線
+func _make_water_board(types: Array) -> GridBoard:
+	var board = GridBoard.new()
+	for x in range(types.size()):
+		board.add_cell(CellData.new(Vector2i(x, 0), types[x]))
+		if x > 0:
+			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
+	return board
+
+## UT-MAGIC-N06: 水魔術の設置可能マスはNORMALのみ（足元・ユニットのいるマスも可）
+func test_water_trap_targets_normal_cells_only() -> void:
+	var tm = TurnManager.new()
+	var board = _make_water_board([
+		Enums.CellType.NORMAL, Enums.CellType.EXIT, Enums.CellType.EVENT, Enums.CellType.ADDITIONAL_MOVE,
+		Enums.CellType.RETURN_TO_START, Enums.CellType.SKIP_TURN, Enums.CellType.ROLL_AGAIN,
+		Enums.CellType.WATER_TRAP, Enums.CellType.NORMAL
+	])
+	var girl = CharacterData.new("GIRL_WATER", "水の少女", Vector2i(0, 0))
+	var witch = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(8, 0))
+	tm.setup_stage(board, [girl], [witch], "STAGE_TEST")
+
+	var targets = tm.get_water_trap_targets("GIRL_WATER")
+	assert_eq(targets.size(), 2, "UT-MAGIC-N06: 設置可能マスはNORMALの2マスのみ")
+	assert_true(targets.has(Vector2i(0, 0)), "UT-MAGIC-N06: 詠唱者の足元に設置可能")
+	assert_true(targets.has(Vector2i(8, 0)), "UT-MAGIC-N06: 魔女のいるNORMALマスに設置可能")
+	assert_true(tm.can_place_water_trap("GIRL_WATER", Vector2i(8, 0)), "UT-MAGIC-N06: can_place_water_trapもtrue")
+
+	var ok = tm.execute_magic("GIRL_WATER", Enums.ElementType.WATER, Vector2i(8, 0))
+	assert_true(ok, "UT-MAGIC-N06: 指定したNORMALマスへの設置に成功")
+	assert_eq(board.get_cell(Vector2i(8, 0)).cell_type, Enums.CellType.WATER_TRAP, "UT-MAGIC-N06: 指定マスがWATER_TRAPになる")
+	assert_eq(board.get_cell(Vector2i(0, 0)).cell_type, Enums.CellType.NORMAL, "UT-MAGIC-N06: 足元は変化しない")
+
+## UT-MAGIC-E05: 特殊マス（EXIT・イベント・+2・戻る・休み・もう1回・設置済み水罠）への設置拒否
+func test_water_magic_fails_on_special_cell() -> void:
+	var specials = [
+		Enums.CellType.EXIT, Enums.CellType.EVENT, Enums.CellType.ADDITIONAL_MOVE,
+		Enums.CellType.RETURN_TO_START, Enums.CellType.SKIP_TURN, Enums.CellType.ROLL_AGAIN,
+		Enums.CellType.WATER_TRAP
+	]
+	for t in specials:
+		var tm = TurnManager.new()
+		var board = _make_water_board([Enums.CellType.NORMAL, t])
+		var girl = CharacterData.new("GIRL_WATER", "水の少女", Vector2i(0, 0))
+		tm.setup_stage(board, [girl], [], "STAGE_TEST")
+		assert_false(tm.can_place_water_trap("GIRL_WATER", Vector2i(1, 0)), "UT-MAGIC-E05: 特殊マス(type=%d)は設置不可" % t)
+		var ok = tm.execute_magic("GIRL_WATER", Enums.ElementType.WATER, Vector2i(1, 0))
+		assert_false(ok, "UT-MAGIC-E05: 特殊マス(type=%d)への詠唱は失敗" % t)
+		assert_eq(board.get_cell(Vector2i(1, 0)).cell_type, t, "UT-MAGIC-E05: 特殊マス(type=%d)の種別は変わらない" % t)
+		assert_false(girl.has_acted, "UT-MAGIC-E05: 失敗時は行動済みにならない(type=%d)" % t)
+
+## UT-MAGIC-E06: 盤面に存在しない座標への設置拒否
+func test_water_magic_fails_on_missing_cell() -> void:
+	var tm = TurnManager.new()
+	var board = _make_water_board([Enums.CellType.NORMAL, Enums.CellType.NORMAL])
+	var girl = CharacterData.new("GIRL_WATER", "水の少女", Vector2i(0, 0))
+	tm.setup_stage(board, [girl], [], "STAGE_TEST")
+	assert_false(tm.can_place_water_trap("GIRL_WATER", Vector2i(5, 5)), "UT-MAGIC-E06: 存在しない座標は設置不可")
+	assert_false(tm.execute_magic("GIRL_WATER", Enums.ElementType.WATER, Vector2i(5, 5)), "UT-MAGIC-E06: 存在しない座標への詠唱は失敗")
+	assert_false(girl.has_acted, "UT-MAGIC-E06: 失敗時は行動済みにならない")
+	assert_false(tm.can_place_water_trap("UNKNOWN_ID", Vector2i(1, 0)), "UT-MAGIC-E06: 存在しない詠唱者は設置不可")
+	assert_eq(tm.get_water_trap_targets("UNKNOWN_ID").size(), 0, "UT-MAGIC-E06: 存在しない詠唱者の設置可能マスは空")
+
+## UT-MAGIC-B02: 水魔術の射程境界（射程2：距離2は可・距離3は不可／-1は全範囲）
+func test_water_magic_range_boundary() -> void:
+	var tm = TurnManager.new()
+	var board = _make_water_board([Enums.CellType.NORMAL, Enums.CellType.NORMAL, Enums.CellType.NORMAL, Enums.CellType.NORMAL, Enums.CellType.NORMAL])
+	var girl = CharacterData.new("GIRL_WATER", "水の少女", Vector2i(0, 0))
+	tm.setup_stage(board, [girl], [], "STAGE_TEST")
+
+	assert_eq(TurnManager.WATER_TRAP_RANGE, -1, "UT-MAGIC-B02: 既定の射程は全範囲(-1)")
+	assert_true(tm.can_place_water_trap("GIRL_WATER", Vector2i(4, 0)), "UT-MAGIC-B02: 全範囲なら距離4も設置可")
+
+	tm.water_trap_range = 2
+	assert_true(tm.can_place_water_trap("GIRL_WATER", Vector2i(2, 0)), "UT-MAGIC-B02: 射程2で距離2は設置可")
+	assert_false(tm.can_place_water_trap("GIRL_WATER", Vector2i(3, 0)), "UT-MAGIC-B02: 射程2で距離3は設置不可")
+	assert_eq(tm.get_water_trap_targets("GIRL_WATER").size(), 3, "UT-MAGIC-B02: 射程2の設置可能マスは距離0〜2の3マス")
+	assert_false(tm.execute_magic("GIRL_WATER", Enums.ElementType.WATER, Vector2i(3, 0)), "UT-MAGIC-B02: 射程外への詠唱は失敗")
+	assert_true(tm.execute_magic("GIRL_WATER", Enums.ElementType.WATER, Vector2i(2, 0)), "UT-MAGIC-B02: 射程内への詠唱は成功")

@@ -17,7 +17,10 @@ signal additional_move_granted(unit_id: String, steps: int)
 signal roll_again_granted(unit_id: String)
 signal returned_to_start_applied(unit_id: String)
 
+## 水魔術の射程（詠唱者から通路をたどった距離）。-1 は全範囲
+const WATER_TRAP_RANGE: int = -1
 
+var water_trap_range: int = WATER_TRAP_RANGE
 var board: GridBoard
 var characters: Dictionary = {}  ## id -> CharacterData
 var enemies: Dictionary = {}     ## id -> EnemyData
@@ -170,16 +173,16 @@ func execute_magic(character_id: String, element: Enums.ElementType, target_coor
             return false
             
         Enums.ElementType.WATER:
-            # 指定マスを水トラップ化
-            var cell = board.get_cell(target_coord) if board else null
-            if cell:
-                cell.cell_type = Enums.CellType.WATER_TRAP
-                caster.is_burrowed = false
-                caster.has_acted = true
-                emit_signal("magic_executed", element, character_id, target_coord)
-                return true
-            DebugLogger.error("TurnManager.execute_magic", "指定されたマスが存在しません", {"coord": target_coord})
-            return false
+            # 指定マスを水トラップ化（射程内のNORMALマスのみ）
+            if not can_place_water_trap(character_id, target_coord):
+                DebugLogger.warn("TurnManager.execute_magic", "指定されたマスには水魔術トラップを設置できません", {"coord": target_coord})
+                return false
+            var cell = board.get_cell(target_coord)
+            cell.cell_type = Enums.CellType.WATER_TRAP
+            caster.is_burrowed = false
+            caster.has_acted = true
+            emit_signal("magic_executed", element, character_id, target_coord)
+            return true
             
         Enums.ElementType.EARTH:
             # 潜行または魔女スタン
@@ -208,6 +211,55 @@ func execute_magic(character_id: String, element: Enums.ElementType, target_coor
             
     return false
 
+
+## 水魔術トラップの設置可能マス一覧（射程内の NORMAL マス。詠唱者の足元・ユニットのいるマスも含む）
+func get_water_trap_targets(caster_id: String) -> Array[Vector2i]:
+    var targets: Array[Vector2i] = []
+    if board == null or not characters.has(caster_id):
+        return targets
+    var origin: Vector2i = characters[caster_id].current_coord
+    var in_range: Dictionary = {}
+    if water_trap_range < 0:
+        for coord in board.cells.keys():
+            in_range[coord] = true
+    elif board.has_cell(origin):
+        # 通路をたどった距離で射程内のマスを求める（BFS）
+        in_range[origin] = 0
+        var queue: Array[Vector2i] = [origin]
+        while queue.size() > 0:
+            var current: Vector2i = queue.pop_front()
+            if in_range[current] >= water_trap_range:
+                continue
+            for n in board.get_accessible_neighbors(current):
+                if not in_range.has(n):
+                    in_range[n] = in_range[current] + 1
+                    queue.append(n)
+    for coord in in_range.keys():
+        var cell = board.get_cell(coord)
+        if cell and cell.cell_type == Enums.CellType.NORMAL:
+            targets.append(coord)
+    return targets
+
+## 指定マスに水魔術トラップを設置できるか
+func can_place_water_trap(caster_id: String, target_coord: Vector2i) -> bool:
+    return get_water_trap_targets(caster_id).has(target_coord)
+
+## 魔女の復活時捕縛判定：復活位置にいる地上のキャラを捕縛する（潜行中はやり過ごし）
+## 主人公を捕縛した場合は GAME_OVER へ遷移し true を返す
+func _resolve_revive_capture(enemy: EnemyData) -> bool:
+    for c in characters.values():
+        if not c.is_alive or c.current_coord != enemy.current_coord:
+            continue
+        if c.is_burrowed:
+            emit_signal("burrow_pass_succeeded", c.character_id, enemy.enemy_id)
+        elif c.character_id == "HERO":
+            current_phase = Enums.TurnPhase.GAME_OVER
+            emit_signal("game_over_triggered", "復活した魔女に捕縛された")
+            return true
+        else:
+            c.kill()
+            emit_signal("unit_killed", c.character_id)
+    return false
 
 ## 待機・祈る（潜行中は潜行継続）
 func execute_wait(character_id: String) -> void:
@@ -253,9 +305,11 @@ func end_turn_and_advance() -> void:
     for c in characters.values():
         c.tick_revive()
         
-    # エネミーの復活カウント処理
+    # エネミーの復活カウント処理（復活した瞬間に復活位置のキャラを捕縛判定）
     for e in enemies.values():
-        e.tick_revive()
-        
+        if e.tick_revive():
+            if _resolve_revive_capture(e):
+                return  ## 主人公捕縛：ゲームオーバーのため次ターンへ進めない
+
     current_turn += 1
     start_player_turn()

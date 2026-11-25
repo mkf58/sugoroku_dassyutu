@@ -12,6 +12,9 @@ func run_all() -> void:
 	test_revive_exact_turn_boundary()
 	test_multiple_allies_sequential_action()
 	test_girl_death_during_step_movement()
+	test_revived_witch_captures_girl()
+	test_revived_witch_captures_hero_game_over()
+	test_revive_capture_decision()
 
 ## UT-TURN-N01: ターン進行と行動リセット
 func test_turn_advance_and_reselection() -> void:
@@ -171,3 +174,100 @@ func test_girl_death_during_step_movement() -> void:
 	assert_true(hero.is_alive, "UT-TURN-N05: 主人公は生存のまま")
 	assert_ne(tm.current_phase, Enums.TurnPhase.GAME_OVER, "UT-TURN-N05: 少女死亡時はゲームオーバーにならない")
 
+
+## 復活捕縛テスト用の盤面：(0,0)〜(2,0) の一直線
+func _make_line_board() -> GridBoard:
+	var board = GridBoard.new()
+	for x in range(3):
+		board.add_cell(CellData.new(Vector2i(x, 0), Enums.CellType.NORMAL))
+		if x > 0:
+			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
+	return board
+
+## UT-TURN-N06: 復活した魔女が復活位置にいる少女を捕縛する
+func test_revived_witch_captures_girl() -> void:
+	var tm = TurnManager.new()
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(2, 0))
+	var girl = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(1, 0))
+	girl.current_coord = Vector2i(0, 0) # 魔女の初期位置に停止中
+	var witch = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	witch.defeat()
+	witch.revive_turn_count = 1 # このターン終了で復活
+	tm.setup_stage(_make_line_board(), [hero, girl], [witch], "STAGE_TEST")
+	var killed: Array = []
+	tm.unit_killed.connect(func(uid): killed.append(uid))
+
+	tm.end_turn_and_advance()
+	assert_true(witch.is_alive, "UT-TURN-N06: 魔女が復活する")
+	assert_false(girl.is_alive, "UT-TURN-N06: 復活位置の少女が捕縛される")
+	assert_eq(girl.revive_turn_count, 3, "UT-TURN-N06: 少女の復活カウントが3")
+	assert_eq(killed, ["GIRL_FIRE"], "UT-TURN-N06: unit_killedが少女IDで発行される")
+	assert_true(hero.is_alive, "UT-TURN-N06: 別マスの主人公は無事")
+	assert_eq(tm.current_phase, Enums.TurnPhase.PLAYER_UNIT_SELECT, "UT-TURN-N06: 少女捕縛ではゲームオーバーにならず次ターンへ")
+	assert_eq(tm.current_turn, 2, "UT-TURN-N06: ターン数が進む")
+
+## UT-TURN-N07: 復活した魔女が復活位置にいる主人公を捕縛するとゲームオーバー
+func test_revived_witch_captures_hero_game_over() -> void:
+	var tm = TurnManager.new()
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(2, 0))
+	hero.current_coord = Vector2i(0, 0)
+	var witch = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	witch.defeat()
+	witch.revive_turn_count = 1
+	tm.setup_stage(_make_line_board(), [hero], [witch], "STAGE_TEST")
+	var reasons: Array = []
+	tm.game_over_triggered.connect(func(r): reasons.append(r))
+
+	tm.end_turn_and_advance()
+	assert_true(witch.is_alive, "UT-TURN-N07: 魔女が復活する")
+	assert_eq(tm.current_phase, Enums.TurnPhase.GAME_OVER, "UT-TURN-N07: ゲームオーバーになる")
+	assert_eq(reasons.size(), 1, "UT-TURN-N07: game_over_triggeredが1回発行される")
+	assert_eq(tm.current_turn, 1, "UT-TURN-N07: 次のプレイヤーターンを始めない")
+
+## UT-TURN-D01: デシジョンテーブル：魔女復活時の捕縛判定
+func test_revive_capture_decision() -> void:
+	# Case 1: 復活位置にいるが潜行中 -> やり過ごし
+	var tm1 = TurnManager.new()
+	var girl1 = CharacterData.new("GIRL_EARTH", "土の少女", Vector2i(1, 0))
+	girl1.current_coord = Vector2i(0, 0)
+	girl1.is_burrowed = true
+	var w1 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	w1.defeat()
+	w1.revive_turn_count = 1
+	tm1.setup_stage(_make_line_board(), [girl1], [w1], "STAGE_TEST")
+	var passed: Array = []
+	tm1.burrow_pass_succeeded.connect(func(uid, eid): passed.append([uid, eid]))
+	tm1.end_turn_and_advance()
+	assert_true(w1.is_alive, "UT-TURN-D01: Case1 魔女は復活")
+	assert_true(girl1.is_alive, "UT-TURN-D01: Case1 潜行中の少女は捕縛されない")
+	assert_eq(passed, [["GIRL_EARTH", "WITCH_1"]], "UT-TURN-D01: Case1 やり過ごしシグナルが発行される")
+
+	# Case 2: 復活位置以外にいる -> 捕縛されない
+	var tm2 = TurnManager.new()
+	var girl2 = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(1, 0))
+	var w2 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	w2.defeat()
+	w2.revive_turn_count = 1
+	tm2.setup_stage(_make_line_board(), [girl2], [w2], "STAGE_TEST")
+	tm2.end_turn_and_advance()
+	assert_true(w2.is_alive, "UT-TURN-D01: Case2 魔女は復活")
+	assert_true(girl2.is_alive, "UT-TURN-D01: Case2 別マスの少女は無事")
+
+	# Case 3: 復活位置にいるが、まだ復活しない（カウント2→1） -> 捕縛されない
+	var tm3 = TurnManager.new()
+	var girl3 = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(1, 0))
+	girl3.current_coord = Vector2i(0, 0)
+	var w3 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	w3.defeat() # カウント2
+	tm3.setup_stage(_make_line_board(), [girl3], [w3], "STAGE_TEST")
+	tm3.end_turn_and_advance()
+	assert_false(w3.is_alive, "UT-TURN-D01: Case3 魔女はまだ復活しない")
+	assert_true(girl3.is_alive, "UT-TURN-D01: Case3 復活前なので少女は無事")
+
+	# Case 4: もともと生存中の魔女と同じマスにいる（復活ではない） -> ターン終了処理では捕縛しない
+	var tm4 = TurnManager.new()
+	var girl4 = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(0, 0))
+	var w4 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	tm4.setup_stage(_make_line_board(), [girl4], [w4], "STAGE_TEST")
+	tm4.end_turn_and_advance()
+	assert_true(girl4.is_alive, "UT-TURN-D01: Case4 復活でない魔女はターン終了時に捕縛しない")

@@ -115,6 +115,10 @@
 | **準正常系** | **UT-MAGIC-E03** | `test_magic_fails_caster_not_found` | 未登録のキャラクターIDで詠唱 | 詠唱拒否（戻り値 `false`） |
 | **準正常系** | **UT-MAGIC-E04** | `test_fire_magic_fails_no_target` | 対象座標に魔女が存在しない | 詠唱失敗（戻り値 `false`） |
 | **境界値** | **UT-MAGIC-B01** | `test_fire_magic_range_boundary` | 距離 2（境界内） vs 距離 3（境界外） | 距離2は成功、距離3は失敗すること |
+| **正常系** | **UT-MAGIC-N06** | `test_water_trap_targets_normal_cells_only` | 全マス種別を並べた盤面で設置可能マスを取得し、魔女のいるNORMALマスへ詠唱 | 設置可能マスは NORMAL のみ（足元・魔女のいるマスを含む）。指定マスだけが `WATER_TRAP` になり、足元は変化しない |
+| **準正常系** | **UT-MAGIC-E05** | `test_water_magic_fails_on_special_cell` | EXIT・EVENT・+2・戻る・休み・もう1回・設置済み水罠の各マスへ詠唱 | 詠唱失敗（`false`）、マス種別は不変、詠唱者は未行動のまま |
+| **準正常系** | **UT-MAGIC-E06** | `test_water_magic_fails_on_missing_cell` | 盤面にない座標への詠唱／未登録の詠唱者 | 詠唱失敗、詠唱者は未行動のまま。未登録の詠唱者は設置可能マスが空 |
+| **境界値** | **UT-MAGIC-B02** | `test_water_magic_range_boundary` | 既定射程（`WATER_TRAP_RANGE = -1`）と、射程2に変更した場合 | 既定は全範囲。射程2では距離2は設置可・距離3は不可、設置可能マスは3マス |
 | **デシジョン** | **UT-MAGIC-D01** | `test_earth_magic_burrow_and_stun` | 対象座標の内容（空きマス vs 魔女、下記テーブル参照） | 自身の地中潜行 または 魔女スタンが排他発動 |
 
 #### 【デシジョンテーブル：UT-MAGIC-D01 土魔法の効果分岐】
@@ -138,6 +142,17 @@
 | **正常系** | **UT-TURN-N04** | `test_multiple_allies_sequential_action` | 主人公行動後に未行動の少女が存在 | 主人公が選択不可になり、少女が選択可能。次ターンで両者リセット |
 | **正常系** | **UT-TURN-N05** | `test_girl_death_during_step_movement` | 少女が魔女のいるマスへ1歩侵入 | 戻り値 `GIRL_DIED`、少女のみ死亡（カウント3）、ゲームオーバーにならない |
 | **境界値** | **UT-TURN-B01** | `test_revive_exact_turn_boundary` | 復活カウント 1（前ターン） vs 0（完了時） | カウント1では依然死亡、0になった瞬間に完全復活 |
+| **正常系** | **UT-TURN-N06** | `test_revived_witch_captures_girl` | 魔女（復活カウント1）の初期位置に少女が停止中でターン終了 | 魔女復活と同時に少女が捕縛（カウント3、`unit_killed` 発行）。ゲームオーバーにならず次ターンへ進む |
+| **正常系** | **UT-TURN-N07** | `test_revived_witch_captures_hero_game_over` | 魔女（復活カウント1）の初期位置に主人公が停止中でターン終了 | `GAME_OVER` へ遷移し `game_over_triggered` を1回発行。次のプレイヤーターンは始めない（ターン数据え置き） |
+| **デシジョン** | **UT-TURN-D01** | `test_revive_capture_decision` | 下記テーブル参照 | 復活した瞬間に復活位置にいる地上のキャラだけが捕縛される |
+
+#### 【デシジョンテーブル：UT-TURN-D01 魔女復活時の捕縛判定】
+| Case | 魔女の状態 | キャラの位置 | キャラの潜行状態 | 結果 |
+| :--- | :--- | :--- | :---: | :--- |
+| 1 | このターンで復活 | 復活位置 | 潜行中 | やり過ごし（`burrow_pass_succeeded` 発行、生存） |
+| 2 | このターンで復活 | 復活位置以外 | 地上 | 捕縛されない |
+| 3 | まだ復活しない（カウント2→1） | 復活位置 | 地上 | 捕縛されない |
+| 4 | 撃破されていない（同じマスにいる） | 同じマス | 地上 | ターン終了処理では捕縛しない（復活ではないため） |
 
 ---
 
