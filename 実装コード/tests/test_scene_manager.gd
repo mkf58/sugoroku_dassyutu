@@ -10,6 +10,19 @@ func run_all() -> void:
     test_prevent_double_transition()
     test_invalid_param_key()
     test_empty_params_dictionary()
+    test_unit_piece_does_not_block_clicks()
+
+## UT-SCENE-N04: 盤面のコマ（UnitPiece）はクリックを受け取らず、下のマスへ通すこと
+func test_unit_piece_does_not_block_clicks() -> void:
+    var piece = load("res://scenes/unit_piece.tscn").instantiate()
+    var controls: Array = []
+    for child in piece.get_children():
+        if child is Control:
+            controls.append(child)
+    assert_true(controls.size() > 0, "UT-SCENE-N04: コマにControlの子ノードがあること")
+    for c in controls:
+        assert_eq(c.mouse_filter, Control.MOUSE_FILTER_IGNORE, "UT-SCENE-N04: %s はマウスを無視すること" % c.name)
+    piece.free()
 
 ## UT-SCENE-N01: 遷移要求時に目的シーンとパラメータが正しく記録されること
 func test_change_scene_registers_target() -> void:

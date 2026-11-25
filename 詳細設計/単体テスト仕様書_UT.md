@@ -192,6 +192,7 @@
 | **準正常系** | **UT-SCENE-E01** | `test_prevent_double_transition` | 遷移中フラグ `is_transitioning = true` の状態で再度 `change_scene` 呼び出し | 重複実行が無視（スキップ）され、最初の遷移先が保持されること |
 | **準正常系** | **UT-SCENE-E02** | `test_invalid_param_key` | 未設定のパラメータキーを `get_param("unknown", "default_val")` で取得 | 指定したデフォルト値 `"default_val"` が安全に返却されること |
 | **境界値** | **UT-SCENE-B01** | `test_empty_params_dictionary` | パラメータに空の辞書 `{}` を渡して遷移 | エラーなく受け付けられ、パラメータがクリア/空辞書となること |
+| **正常系** | **UT-SCENE-N04** | `test_unit_piece_does_not_block_clicks` | `unit_piece.tscn` をインスタンス化し、子の Control を走査 | すべて `MOUSE_FILTER_IGNORE`（コマの上のクリックが下のマスに届く） |
 
 ---
 
