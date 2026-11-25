@@ -17,6 +17,7 @@ func run_all() -> void:
 	test_revive_capture_decision()
 	test_stun_decrements_on_turn_end()
 	test_stun_end_captures_unit_on_same_cell()
+	test_earth_stun_lasts_two_enemy_turns()
 
 ## UT-TURN-N01: ターン進行と行動リセット
 func test_turn_advance_and_reselection() -> void:
@@ -319,3 +320,20 @@ func test_stun_end_captures_unit_on_same_cell() -> void:
 	tm3.setup_stage(_make_line_board(), [girl3], [w4], "STAGE_TEST")
 	tm3.end_turn_and_advance()
 	assert_true(girl3.is_alive, "UT-TURN-N09: スタンが残っている間は捕縛しない")
+
+## UT-TURN-N10: 土魔術のスタンは魔女ターン2回分続き、その間のプレイヤーターンも無害
+func test_earth_stun_lasts_two_enemy_turns() -> void:
+	var tm = TurnManager.new()
+	var earth_girl = CharacterData.new("GIRL_EARTH", "土の少女", Vector2i(2, 0))
+	var witch = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	tm.setup_stage(_make_line_board(), [earth_girl], [witch], "STAGE_TEST")
+
+	assert_true(tm.execute_earth("GIRL_EARTH", "WITCH_1"), "UT-TURN-N10: スタン成功")
+	assert_eq(witch.stun_turns, TurnManager.EARTH_STUN_TURNS, "UT-TURN-N10: スタンは2")
+	assert_false(witch.is_dangerous(), "UT-TURN-N10: 詠唱したターン（1回目の魔女ターン前）は無害")
+	tm.end_turn_and_advance()
+	assert_eq(witch.stun_turns, 1, "UT-TURN-N10: 1回目のターン終了で1")
+	assert_false(witch.is_dangerous(), "UT-TURN-N10: 次のプレイヤーターンも無害（2回目の魔女ターンも休み）")
+	tm.end_turn_and_advance()
+	assert_eq(witch.stun_turns, 0, "UT-TURN-N10: 2回目のターン終了で解除")
+	assert_true(witch.is_dangerous(), "UT-TURN-N10: 解除後は捕縛判定あり")

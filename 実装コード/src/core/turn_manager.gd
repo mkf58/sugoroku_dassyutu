@@ -24,6 +24,8 @@ const WIND_RANGE: int = -1
 const WIND_DIRECTIONS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 ## 土魔術の射程（詠唱者から対象ユニットまで通路をたどった距離）。-1 は全範囲
 const EARTH_RANGE: int = 6
+## 土魔術のスタン時間：詠唱したターンの魔女ターンと、次の魔女ターンの2回休み（その間のプレイヤーターンも無害）
+const EARTH_STUN_TURNS: int = 2
 
 var water_trap_range: int = WATER_TRAP_RANGE
 var wind_range: int = WIND_RANGE
@@ -364,6 +366,7 @@ func execute_wind(caster_id: String, unit_id: String, dir: Vector2i) -> Dictiona
 
 ## 土魔術の対象にできるユニットID一覧
 ## 射程内にいる、生存中で潜行していない主人公・少女（自分自身も可）と、スタンしていない生存中の魔女
+## スタンが解けた直後（stun_immune_turns > 0）の魔女は連続スタン防止のため対象外
 func get_earth_targets(caster_id: String) -> Array[String]:
     var targets: Array[String] = []
     if board == null or not characters.has(caster_id) or not characters[caster_id].is_alive:
@@ -373,7 +376,7 @@ func get_earth_targets(caster_id: String) -> Array[String]:
         if c.is_alive and not c.is_burrowed and in_range.has(c.current_coord):
             targets.append(c.character_id)
     for e in enemies.values():
-        if e.is_dangerous() and in_range.has(e.current_coord):
+        if e.is_dangerous() and e.stun_immune_turns <= 0 and in_range.has(e.current_coord):
             targets.append(e.enemy_id)
     return targets
 
@@ -396,7 +399,7 @@ func execute_earth(caster_id: String, unit_id: String) -> bool:
     if characters.has(unit_id):
         unit.is_burrowed = true
     else:
-        unit.stun_turns = 1
+        unit.stun_turns = EARTH_STUN_TURNS
     caster.has_acted = true
     emit_signal("magic_executed", Enums.ElementType.EARTH, caster_id, unit.current_coord)
     return true
@@ -468,10 +471,14 @@ func end_turn_and_advance() -> void:
             if _resolve_revive_capture(e):
                 return  ## 主人公捕縛：ゲームオーバーのため次ターンへ進めない
         elif e.is_alive and e.stun_turns > 0:
-            # スタンのカウント処理（解けた瞬間に同じマスのキャラを捕縛判定）
+            # スタンのカウント処理（解けた瞬間に同じマスのキャラを捕縛判定。次のターンは再スタン不可）
             e.stun_turns -= 1
-            if e.stun_turns == 0 and _resolve_revive_capture(e):
-                return
+            if e.stun_turns == 0:
+                e.stun_immune_turns = 1
+                if _resolve_revive_capture(e):
+                    return
+        elif e.stun_immune_turns > 0:
+            e.stun_immune_turns -= 1
 
     current_turn += 1
     start_player_turn()

@@ -26,6 +26,7 @@ func run_all() -> void:
 	test_earth_invalid_targets()
 	test_earth_range_boundary()
 	test_stunned_witch_is_harmless()
+	test_earth_cannot_stun_consecutively()
 
 ## UT-MAGIC-N01: 炎魔法による魔女撃破
 func test_fire_magic_defeats_witch() -> void:
@@ -182,7 +183,7 @@ func test_earth_magic_burrow_and_stun() -> void:
 	earth_girl.has_acted = false
 	var res3 = tm.execute_earth("GIRL_EARTH", "WITCH")
 	assert_true(res3, "UT-MAGIC-D01: 魔女への詠唱成功")
-	assert_eq(witch.stun_turns, 1, "UT-MAGIC-D01: 魔女が1ターンスタンすること")
+	assert_eq(witch.stun_turns, 2, "UT-MAGIC-D01: 魔女が2回休みのスタンになること")
 	assert_false(earth_girl.is_burrowed, "UT-MAGIC-D01: 魔女が対象なら詠唱者は潜行しない")
 
 ## UT-MAGIC-N05: 移動完了による潜行解除
@@ -549,3 +550,28 @@ func test_stunned_witch_is_harmless() -> void:
 	var r3 = tm2.execute_wind("GIRL_WIND", "HERO", Vector2i.RIGHT)
 	assert_eq(r3.get("result"), "BLOWN", "UT-MAGIC-N10: スタン中の魔女にはぶつからない")
 	assert_eq(hero2.current_coord, Vector2i(3, 0), "UT-MAGIC-N10: スタン中の魔女のマスに着地できる")
+
+## UT-MAGIC-E09: スタンが解けた直後のターンは同じ魔女を再スタンできない（連続スタン防止）
+func test_earth_cannot_stun_consecutively() -> void:
+	var tm = TurnManager.new()
+	var earth_girl = CharacterData.new("GIRL_EARTH", "土の少女", Vector2i(0, 0))
+	var witch = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(3, 0))
+	tm.setup_stage(_make_wind_line(5), [earth_girl], [witch], "STAGE_TEST")
+
+	assert_true(tm.execute_earth("GIRL_EARTH", "WITCH_1"), "UT-MAGIC-E09: 1回目のスタン成功")
+	tm.end_turn_and_advance()
+	assert_false(tm.get_earth_targets("GIRL_EARTH").has("WITCH_1"), "UT-MAGIC-E09: スタン中は対象外")
+	tm.end_turn_and_advance()
+	assert_eq(witch.stun_turns, 0, "UT-MAGIC-E09: 2回休みの後にスタン解除")
+	assert_eq(witch.stun_immune_turns, 1, "UT-MAGIC-E09: 解除直後は再スタン不可が1")
+	assert_false(tm.get_earth_targets("GIRL_EARTH").has("WITCH_1"), "UT-MAGIC-E09: 解除直後のターンは対象外")
+	assert_false(tm.execute_earth("GIRL_EARTH", "WITCH_1"), "UT-MAGIC-E09: 解除直後のターンは詠唱失敗")
+	assert_true(tm.get_earth_targets("GIRL_EARTH").has("GIRL_EARTH"), "UT-MAGIC-E09: 味方への詠唱は引き続き可能")
+	tm.end_turn_and_advance()
+	assert_eq(witch.stun_immune_turns, 0, "UT-MAGIC-E09: 1ターン後に再スタン不可が解ける")
+	assert_true(tm.execute_earth("GIRL_EARTH", "WITCH_1"), "UT-MAGIC-E09: その次のターンからは再びスタンできる")
+
+	# 撃破されるとスタン・再スタン不可はリセットされる
+	witch.defeat()
+	assert_eq(witch.stun_turns, 0, "UT-MAGIC-E09: 撃破でスタンはリセット")
+	assert_eq(witch.stun_immune_turns, 0, "UT-MAGIC-E09: 撃破で再スタン不可もリセット")

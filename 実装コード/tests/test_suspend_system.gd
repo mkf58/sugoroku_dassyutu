@@ -19,6 +19,7 @@ func run_all() -> void:
     test_load_suspend_corrupted()
     test_slot_load_clears_suspend()
     test_consume_suspend()
+    test_stun_immunity_round_trip()
     _cleanup()
 
 func _cleanup() -> void:
@@ -215,3 +216,20 @@ func test_consume_suspend() -> void:
     assert_not_null(r, "UT-SUSP-N06: 読込成功")
     assert_false(SaveManager.has_suspend(TEST_DIR), "UT-SUSP-N06: ロード後は消える")
     assert_null(SaveManager.consume_suspend(TEST_DIR), "UT-SUSP-N06: 2回目はnull")
+
+## UT-SUSP-N07: 再スタン不可ターンも中断データで保存・復元される
+func test_stun_immunity_round_trip() -> void:
+    var src = _make_tm(_make_board())
+    src.enemies["WITCH_1"].stun_immune_turns = 1
+    var s = SuspendData.capture(src, _make_board())
+    assert_eq(s.enemies["WITCH_1"]["stun_immune_turns"], 1, "UT-SUSP-N07: 再スタン不可が保存される")
+    var restored = SuspendData.from_dict(JSON.parse_string(JSON.stringify(s.to_dict())))
+    var dst = _make_tm(_make_board())
+    assert_true(restored.apply_to(dst), "UT-SUSP-N07: 復元成功")
+    assert_eq(dst.enemies["WITCH_1"].stun_immune_turns, 1, "UT-SUSP-N07: JSON経由でも再スタン不可が復元される")
+    # 古い中断データ（キーなし）は0として扱う
+    var old = SuspendData.capture(src, _make_board())
+    old.enemies["WITCH_1"].erase("stun_immune_turns")
+    var dst2 = _make_tm(_make_board())
+    old.apply_to(dst2)
+    assert_eq(dst2.enemies["WITCH_1"].stun_immune_turns, 0, "UT-SUSP-N07: キーがなければ0")

@@ -43,6 +43,7 @@ static func capture(tm: TurnManager, fresh_board: GridBoard) -> SuspendData:
             "is_alive": e.is_alive,
             "revive_turn_count": e.revive_turn_count,
             "stun_turns": e.stun_turns,
+            "stun_immune_turns": e.stun_immune_turns,
             "patrol_index": e.patrol_index,
         }
     if tm.board != null and fresh_board != null:
@@ -84,6 +85,7 @@ func apply_to(tm: TurnManager) -> bool:
         e.is_alive = bool(d.get("is_alive", true))
         e.revive_turn_count = int(d.get("revive_turn_count", 0))
         e.stun_turns = int(d.get("stun_turns", 0))
+        e.stun_immune_turns = int(d.get("stun_immune_turns", 0))
         e.patrol_index = int(d.get("patrol_index", 0))
     if tm.board != null:
         for o in cell_overrides:

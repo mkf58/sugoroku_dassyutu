@@ -46,7 +46,7 @@ var wind_landing_map: Dictionary = {}   ## 着地マス -> 方向
 var moving_piece_id: String = ""        ## 移動アニメ中のピース（空なら操作中キャラ）
 var is_selecting_earth_target: bool = false   ## 土魔術の対象を選択中
 var earth_target_ids: Array[String] = []
-const EARTH_MENU_DESC = "射程6マス以内の味方を潜らせる／魔女を1ターン止める"
+const EARTH_MENU_DESC = "射程6マス以内の味方を潜らせる／魔女を2回休みにする"
 
 ## 魔法の対象・設置先を選択中か（コマンドメニュー表示・中断セーブを止める）
 func _is_selecting_magic_target() -> bool:
@@ -777,7 +777,7 @@ func _begin_earth_target_selection() -> void:
 		if u:
 			board_view.set_cell_highlight(u.current_coord, true, Color(0.8, 0.55, 0.25, 0.9))
 	var caster = tm.characters[current_acting_unit_id]
-	hud.update_turn_info(tm.current_turn, "【%s】土魔術の対象（味方：潜行／魔女：1ターン停止）をクリック [右クリック: 戻る]" % caster.name)
+	hud.update_turn_info(tm.current_turn, "【%s】土魔術の対象（味方：潜行／魔女：2回休み）をクリック [右クリック: 戻る]" % caster.name)
 	hud.set_action_buttons_enabled(false)
 
 ## 土魔術：選択を終了する（ハイライト解除）
@@ -815,7 +815,7 @@ func _on_earth_cell_clicked(coord: Vector2i) -> void:
 	else:
 		if target_piece:
 			target_piece.set_target_name("スタン中")
-		hud.log_message("[Magic] 【土魔術】発動！%s が %s を1ターン行動不能にしました。" % [caster.name, target_id])
+		hud.log_message("[Magic] 【土魔術】発動！%s が %s を2回休み（次の魔女ターンまで行動不能・その間は無害）にしました。" % [caster.name, target_id])
 	_on_unit_action_finished(current_acting_unit_id)
 
 func _on_wait_pressed() -> void:
