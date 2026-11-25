@@ -20,6 +20,10 @@ func _init(p_id: String, p_type: Enums.EnemyType, p_coord: Vector2i) -> void:
     revive_turn_count = 0
     stun_turns = 0
 
+## 捕縛判定を持つ状態か（生存中かつスタンしていない）。スタン中の魔女は無害
+func is_dangerous() -> bool:
+    return is_alive and stun_turns <= 0
+
 func defeat() -> void:
     is_alive = false
     revive_turn_count = 2

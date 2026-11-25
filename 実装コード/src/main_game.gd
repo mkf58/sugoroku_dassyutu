@@ -44,10 +44,13 @@ var wind_target_ids: Array[String] = []
 var wind_target_id: String = ""
 var wind_landing_map: Dictionary = {}   ## 着地マス -> 方向
 var moving_piece_id: String = ""        ## 移動アニメ中のピース（空なら操作中キャラ）
+var is_selecting_earth_target: bool = false   ## 土魔術の対象を選択中
+var earth_target_ids: Array[String] = []
+const EARTH_MENU_DESC = "射程6マス以内の味方を潜らせる／魔女を1ターン止める"
 
 ## 魔法の対象・設置先を選択中か（コマンドメニュー表示・中断セーブを止める）
 func _is_selecting_magic_target() -> bool:
-	return is_selecting_water_target or wind_select_state != WindSelect.NONE
+	return is_selecting_water_target or wind_select_state != WindSelect.NONE or is_selecting_earth_target
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -78,7 +81,7 @@ func _get_enemy_obstacles() -> Array[Vector2i]:
 	var unit = tm.characters.get(current_acting_unit_id, null)
 	if unit and not unit.is_burrowed:
 		for e in tm.enemies.values():
-			if e.is_alive:
+			if e.is_dangerous():  # スタン中の魔女は無害なので通れる
 				obstacles.append(e.current_coord)
 	return obstacles
 
@@ -421,8 +424,8 @@ func _show_action_command_menu(custom_mouse_pos: Vector2 = Vector2.ZERO) -> void
 	if current_acting_unit_id == "HERO":
 		if unit.available_magics.has(Enums.ElementType.EARTH):
 			magic_name = "土魔術"
-			magic_desc = "地中に潜行して魔女をやり過ごす"
-			can_magic = not unit.is_burrowed
+			can_magic = not tm.get_earth_targets(current_acting_unit_id).is_empty()
+			magic_desc = EARTH_MENU_DESC if can_magic else "土魔術の対象がいません"
 		else:
 			magic_name = "魔法なし"
 			magic_desc = "使用可能な魔法がありません"
@@ -449,8 +452,8 @@ func _show_action_command_menu(custom_mouse_pos: Vector2 = Vector2.ZERO) -> void
 		magic_desc = "選んだユニットを直線の最も遠いマスまで吹き飛ばす" if can_magic else "吹き飛ばせるユニットがいません"
 	elif unit.available_magics.has(Enums.ElementType.EARTH):
 		magic_name = "土魔術"
-		magic_desc = "地中に潜行して魔女をやり過ごす"
-		can_magic = not unit.is_burrowed
+		can_magic = not tm.get_earth_targets(current_acting_unit_id).is_empty()
+		magic_desc = EARTH_MENU_DESC if can_magic else "土魔術の対象がいません"
 	
 	action_command_menu.setup_unit(
 		current_acting_unit_id,
@@ -613,13 +616,7 @@ func _on_magic_pressed() -> void:
 		_begin_water_target_selection()
 
 	elif unit.available_magics.has(Enums.ElementType.EARTH):
-		unit.is_burrowed = true
-		if piece:
-			piece.set_burrowed(true)
-		unit.has_acted = true
-		hud.update_turn_info(tm.current_turn, "【%s】土魔術で地中に潜行した！" % unit.name)
-		hud.log_message("[Magic] %s が土魔術で地中に潜行しました（魔女をやり過ごせます）。" % unit.name)
-		_on_unit_action_finished(current_acting_unit_id)
+		_begin_earth_target_selection()
 		
 	elif unit.available_magics.has(Enums.ElementType.WIND):
 		_begin_wind_target_selection()
@@ -766,6 +763,61 @@ func _execute_wind(dir: Vector2i) -> void:
 	selected_path = res["path"]
 	piece.animate_path(res["path"], func(_c: Vector2i, _r: int): return {"result": "CONTINUE"}, finish)
 
+## 土魔術：対象にできるユニットのマスをハイライトし、対象選択モードへ入る
+func _begin_earth_target_selection() -> void:
+	earth_target_ids = tm.get_earth_targets(current_acting_unit_id)
+	if earth_target_ids.is_empty():
+		DebugLogger.warn("MainGame._begin_earth_target_selection", "土魔術の対象がいません")
+		_show_action_command_menu()
+		return
+	is_selecting_earth_target = true
+	board_view.clear_highlights()
+	for uid in earth_target_ids:
+		var u = tm.get_unit(uid)
+		if u:
+			board_view.set_cell_highlight(u.current_coord, true, Color(0.8, 0.55, 0.25, 0.9))
+	var caster = tm.characters[current_acting_unit_id]
+	hud.update_turn_info(tm.current_turn, "【%s】土魔術の対象（味方：潜行／魔女：1ターン停止）をクリック [右クリック: 戻る]" % caster.name)
+	hud.set_action_buttons_enabled(false)
+
+## 土魔術：選択を終了する（ハイライト解除）
+func _end_earth_selection() -> void:
+	is_selecting_earth_target = false
+	earth_target_ids.clear()
+	board_view.clear_highlights()
+
+## 土魔術：クリックしたマスの対象に詠唱して行動終了
+func _on_earth_cell_clicked(coord: Vector2i) -> void:
+	var target_id = ""
+	for uid in earth_target_ids:
+		var u = tm.get_unit(uid)
+		if u and u.current_coord == coord:
+			target_id = uid
+			break
+	if target_id.is_empty():
+		DebugLogger.warn("MainGame._on_earth_cell_clicked", "土魔術の対象ではありません", {"clicked_coord": coord})
+		return
+	var caster = tm.characters[current_acting_unit_id]
+	_end_earth_selection()
+	if not tm.execute_earth(current_acting_unit_id, target_id):
+		hud.log_message("[Magic] 土魔術を発動できませんでした。")
+		_show_action_command_menu()
+		return
+	var caster_piece = board_view.get_piece(current_acting_unit_id)
+	if caster_piece:
+		caster_piece.set_burrowed(caster.is_burrowed)
+	var target_piece = board_view.get_piece(target_id)
+	if target_id in tm.characters:
+		var target = tm.characters[target_id]
+		if target_piece:
+			target_piece.set_burrowed(true)
+		hud.log_message("[Magic] 【土魔術】発動！%s が %s を地中に潜らせました（魔女をやり過ごせます）。" % [caster.name, target.name])
+	else:
+		if target_piece:
+			target_piece.set_target_name("スタン中")
+		hud.log_message("[Magic] 【土魔術】発動！%s が %s を1ターン行動不能にしました。" % [caster.name, target_id])
+	_on_unit_action_finished(current_acting_unit_id)
+
 func _on_wait_pressed() -> void:
 	if is_moving:
 		DebugLogger.warn("MainGame._on_wait_pressed", "コマ移動中のため待機できません")
@@ -800,6 +852,10 @@ func _on_cell_clicked(coord: Vector2i) -> void:
 
 	if wind_select_state != WindSelect.NONE:
 		_on_wind_cell_clicked(coord)
+		return
+
+	if is_selecting_earth_target:
+		_on_earth_cell_clicked(coord)
 		return
 
 	if current_dice_roll <= 0:
@@ -858,6 +914,14 @@ func _go_back() -> void:
 		hud.set_action_buttons_enabled(true)
 		_show_action_command_menu(mouse_pos)
 		DebugLogger.info("MainGame._go_back", "水魔術の設置先選択を取りやめてコマンドメニューへ復帰")
+		return
+
+	# 3-0. 土魔術の対象選択中の場合：選択を取りやめてコマンドメニューへ復帰
+	if is_selecting_earth_target:
+		_end_earth_selection()
+		hud.set_action_buttons_enabled(true)
+		_show_action_command_menu(mouse_pos)
+		DebugLogger.info("MainGame._go_back", "土魔術の対象選択を取りやめてコマンドメニューへ復帰")
 		return
 
 	# 3-1. 風魔術の選択中の場合：着地マス選択→対象選択→コマンドメニューの順に1つずつ戻る
@@ -962,6 +1026,8 @@ func _advance_to_enemy_turn() -> void:
 	for e in tm.enemies.values():
 		if e.is_alive and e.stun_turns <= 0:
 			alive_enemies.append(e)
+		elif e.is_alive:
+			hud.log_message("[Enemy] %s は土魔術で動けない（このターンは行動しない）。" % e.enemy_id)
 			
 	if alive_enemies.is_empty():
 		hud.log_message("[Enemy] 行動可能な魔女が存在しないため、魔女ターンを終了します。")
@@ -1059,6 +1125,9 @@ func _on_enemy_turn_finished() -> void:
 	for e in tm.enemies.values():
 		var ep = board_view.get_piece(e.enemy_id)
 		if ep:
+			# スタンが解けた魔女の「スタン中」表示を消す
+			if e.stun_turns <= 0 and ep.target_icon.text.ends_with("スタン中"):
+				ep.set_target_name("")
 			if e.is_alive and not ep.visible:
 				ep.visible = true
 				ep.position = Vector2(e.current_coord.x * 64 + 16, e.current_coord.y * 64 + 16)

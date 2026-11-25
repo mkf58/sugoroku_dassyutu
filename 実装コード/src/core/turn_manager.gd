@@ -22,9 +22,12 @@ const WATER_TRAP_RANGE: int = -1
 ## 風魔術の射程（詠唱者から対象ユニットまで通路をたどった距離）。-1 は全範囲
 const WIND_RANGE: int = -1
 const WIND_DIRECTIONS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
+## 土魔術の射程（詠唱者から対象ユニットまで通路をたどった距離）。-1 は全範囲
+const EARTH_RANGE: int = 6
 
 var water_trap_range: int = WATER_TRAP_RANGE
 var wind_range: int = WIND_RANGE
+var earth_range: int = EARTH_RANGE
 var board: GridBoard
 var characters: Dictionary = {}  ## id -> CharacterData
 var enemies: Dictionary = {}     ## id -> EnemyData
@@ -85,9 +88,9 @@ func step_unit(unit: CharacterData, to_coord: Vector2i, remaining_steps: int) ->
     emit_signal("unit_step_moved", unit.character_id, from_coord, to_coord, remaining_steps)
 
     
-    # 1. エネミーとのリアルタイム接触判定
+    # 1. エネミーとのリアルタイム接触判定（スタン中の魔女は無害）
     for enemy in enemies.values():
-        if enemy.is_alive and enemy.current_coord == to_coord:
+        if enemy.is_dangerous() and enemy.current_coord == to_coord:
             if unit.is_burrowed:
                 # 潜行中：やり過ごし成功
                 emit_signal("burrow_pass_succeeded", unit.character_id, enemy.enemy_id)
@@ -189,19 +192,9 @@ func execute_magic(character_id: String, element: Enums.ElementType, target_coor
             return true
             
         Enums.ElementType.EARTH:
-            # 潜行または魔女スタン
-            var target_enemy: EnemyData = null
-            for e in enemies.values():
-                if e.is_alive and e.current_coord == target_coord:
-                    target_enemy = e
-                    break
-            if target_enemy:
-                target_enemy.stun_turns = 1
-            else:
-                caster.is_burrowed = true
-            caster.has_acted = true
-            emit_signal("magic_executed", element, character_id, target_coord)
-            return true
+            # 土魔術は対象ユニットが必要なため execute_earth を使う
+            DebugLogger.error("TurnManager.execute_magic", "土魔術は execute_earth で実行してください", {"id": character_id})
+            return false
             
         Enums.ElementType.WIND:
             # 風魔術は対象ユニットと方向が必要なため execute_wind を使う
@@ -270,8 +263,8 @@ func _is_occupied_by_other(coord: Vector2i, unit_id: String) -> bool:
         if c.character_id != unit_id and c.is_alive and c.current_coord == coord:
             return true
     for e in enemies.values():
-        if e.enemy_id != unit_id and e.is_alive and e.current_coord == coord:
-            return true
+        if e.enemy_id != unit_id and e.is_dangerous() and e.current_coord == coord:
+            return true  ## スタン中の魔女のマスには着地できる
     return false
 
 ## 風魔術の吹き飛び結果を計算する（状態は変更しない）
@@ -297,7 +290,7 @@ func compute_wind_blow(unit_id: String, dir: Vector2i) -> Dictionary:
         path.append(current)
         if is_character:
             for e in enemies.values():
-                if e.is_alive and e.current_coord == current:
+                if e.is_dangerous() and e.current_coord == current:
                     captured_by = e.enemy_id
                     break
             if not captured_by.is_empty():
@@ -369,7 +362,46 @@ func execute_wind(caster_id: String, unit_id: String, dir: Vector2i) -> Dictiona
             result = "GIRL_DIED"
     return {"result": result, "unit_id": unit_id, "path": blow["path"], "to": blow["to"], "captured_by": blow["captured_by"]}
 
-## 魔女の復活時捕縛判定：復活位置にいる地上のキャラを捕縛する（潜行中はやり過ごし）
+## 土魔術の対象にできるユニットID一覧
+## 射程内にいる、生存中で潜行していない主人公・少女（自分自身も可）と、スタンしていない生存中の魔女
+func get_earth_targets(caster_id: String) -> Array[String]:
+    var targets: Array[String] = []
+    if board == null or not characters.has(caster_id) or not characters[caster_id].is_alive:
+        return targets
+    var in_range = _get_cells_in_range(characters[caster_id].current_coord, earth_range)
+    for c in characters.values():
+        if c.is_alive and not c.is_burrowed and in_range.has(c.current_coord):
+            targets.append(c.character_id)
+    for e in enemies.values():
+        if e.is_dangerous() and in_range.has(e.current_coord):
+            targets.append(e.enemy_id)
+    return targets
+
+## 土魔術の実行：味方なら潜行させ、魔女なら1ターン行動不能（スタン）にする
+## 自分以外を対象にした場合、詠唱者は地上に出る（潜行解除）
+func execute_earth(caster_id: String, unit_id: String) -> bool:
+    if not characters.has(caster_id):
+        DebugLogger.error("TurnManager.execute_earth", "詠唱者が存在しません", {"id": caster_id})
+        return false
+    var caster = characters[caster_id]
+    if not caster.is_alive or caster.has_acted:
+        DebugLogger.warn("TurnManager.execute_earth", "詠唱者は死亡中または行動済みです", {"id": caster_id})
+        return false
+    if not get_earth_targets(caster_id).has(unit_id):
+        DebugLogger.warn("TurnManager.execute_earth", "指定ユニットは土魔術の対象にできません", {"unit_id": unit_id})
+        return false
+    if unit_id != caster_id:
+        caster.is_burrowed = false
+    var unit = get_unit(unit_id)
+    if characters.has(unit_id):
+        unit.is_burrowed = true
+    else:
+        unit.stun_turns = 1
+    caster.has_acted = true
+    emit_signal("magic_executed", Enums.ElementType.EARTH, caster_id, unit.current_coord)
+    return true
+
+## 魔女の復活時・スタン解除時の捕縛判定：魔女と同じマスにいる地上のキャラを捕縛する（潜行中はやり過ごし）
 ## 主人公を捕縛した場合は GAME_OVER へ遷移し true を返す
 func _resolve_revive_capture(enemy: EnemyData) -> bool:
     for c in characters.values():
@@ -435,6 +467,11 @@ func end_turn_and_advance() -> void:
         if e.tick_revive():
             if _resolve_revive_capture(e):
                 return  ## 主人公捕縛：ゲームオーバーのため次ターンへ進めない
+        elif e.is_alive and e.stun_turns > 0:
+            # スタンのカウント処理（解けた瞬間に同じマスのキャラを捕縛判定）
+            e.stun_turns -= 1
+            if e.stun_turns == 0 and _resolve_revive_capture(e):
+                return
 
     current_turn += 1
     start_player_turn()

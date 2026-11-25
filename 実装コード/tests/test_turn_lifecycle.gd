@@ -15,6 +15,8 @@ func run_all() -> void:
 	test_revived_witch_captures_girl()
 	test_revived_witch_captures_hero_game_over()
 	test_revive_capture_decision()
+	test_stun_decrements_on_turn_end()
+	test_stun_end_captures_unit_on_same_cell()
 
 ## UT-TURN-N01: ターン進行と行動リセット
 func test_turn_advance_and_reselection() -> void:
@@ -271,3 +273,49 @@ func test_revive_capture_decision() -> void:
 	tm4.setup_stage(_make_line_board(), [girl4], [w4], "STAGE_TEST")
 	tm4.end_turn_and_advance()
 	assert_true(girl4.is_alive, "UT-TURN-D01: Case4 復活でない魔女はターン終了時に捕縛しない")
+
+## UT-TURN-N08: スタンはターン終了で1減り、魔女は次のターンから行動できる
+func test_stun_decrements_on_turn_end() -> void:
+	var tm = TurnManager.new()
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(2, 0))
+	var witch = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	witch.stun_turns = 1
+	tm.setup_stage(_make_line_board(), [hero], [witch], "STAGE_TEST")
+	tm.end_turn_and_advance()
+	assert_eq(witch.stun_turns, 0, "UT-TURN-N08: ターン終了でスタンが0になる")
+	tm.end_turn_and_advance()
+	assert_eq(witch.stun_turns, 0, "UT-TURN-N08: 0より小さくならない")
+
+## UT-TURN-N09: スタンが解けた瞬間、同じマスにいる地上のキャラを捕縛する（潜行中はやり過ごし）
+func test_stun_end_captures_unit_on_same_cell() -> void:
+	var tm = TurnManager.new()
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(2, 0))
+	var girl = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(0, 0))
+	var earth = CharacterData.new("GIRL_EARTH", "土の少女", Vector2i(1, 0))
+	earth.is_burrowed = true
+	var w1 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	w1.stun_turns = 1
+	var w2 = EnemyData.new("WITCH_2", Enums.EnemyType.TRACKING, Vector2i(1, 0))
+	w2.stun_turns = 1
+	tm.setup_stage(_make_line_board(), [hero, girl, earth], [w1, w2], "STAGE_TEST")
+	tm.end_turn_and_advance()
+	assert_false(girl.is_alive, "UT-TURN-N09: スタンが解けた魔女と同じマスの少女は捕縛される")
+	assert_true(earth.is_alive, "UT-TURN-N09: 潜行中の少女はやり過ごす")
+	assert_eq(tm.current_phase, Enums.TurnPhase.PLAYER_UNIT_SELECT, "UT-TURN-N09: 少女の捕縛では次ターンへ進む")
+
+	var tm2 = TurnManager.new()
+	var hero2 = CharacterData.new("HERO", "主人公", Vector2i(0, 0))
+	var w3 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	w3.stun_turns = 1
+	tm2.setup_stage(_make_line_board(), [hero2], [w3], "STAGE_TEST")
+	tm2.end_turn_and_advance()
+	assert_eq(tm2.current_phase, Enums.TurnPhase.GAME_OVER, "UT-TURN-N09: スタンが解けた魔女と同じマスの主人公はゲームオーバー")
+
+	# スタンがまだ残る（2→1）なら捕縛しない
+	var tm3 = TurnManager.new()
+	var girl3 = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(0, 0))
+	var w4 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(0, 0))
+	w4.stun_turns = 2
+	tm3.setup_stage(_make_line_board(), [girl3], [w4], "STAGE_TEST")
+	tm3.end_turn_and_advance()
+	assert_true(girl3.is_alive, "UT-TURN-N09: スタンが残っている間は捕縛しない")

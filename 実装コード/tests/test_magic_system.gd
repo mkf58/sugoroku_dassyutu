@@ -23,6 +23,9 @@ func run_all() -> void:
 	test_wind_ignores_cell_effects()
 	test_wind_invalid_targets()
 	test_wind_range_boundary()
+	test_earth_invalid_targets()
+	test_earth_range_boundary()
+	test_stunned_witch_is_harmless()
 
 ## UT-MAGIC-N01: 炎魔法による魔女撃破
 func test_fire_magic_defeats_witch() -> void:
@@ -155,20 +158,32 @@ func test_earth_magic_burrow_and_stun() -> void:
 		if x > 0:
 			board.connect_cells(Vector2i(x - 1, 0), Vector2i(x, 0))
 	var earth_girl = CharacterData.new("GIRL_EARTH", "土の少女", Vector2i(0, 0))
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(1, 0))
 	var witch = EnemyData.new("WITCH", Enums.EnemyType.TRACKING, Vector2i(2, 0))
-	tm.setup_stage(board, [earth_girl], [witch], "STAGE_TEST")
-	
-	# Case 1: 空きマス対象 -> 自身潜行
-	var res1 = tm.execute_magic("GIRL_EARTH", Enums.ElementType.EARTH, Vector2i(1, 0))
-	assert_true(res1, "UT-MAGIC-D01: 空きマス詠唱成功")
+	tm.setup_stage(board, [hero, earth_girl], [witch], "STAGE_TEST")
+
+	# Case 1: 自分自身を対象 -> 自身潜行
+	var res1 = tm.execute_earth("GIRL_EARTH", "GIRL_EARTH")
+	assert_true(res1, "UT-MAGIC-D01: 自分自身への詠唱成功")
 	assert_true(earth_girl.is_burrowed, "UT-MAGIC-D01: 自身が潜行状態になること")
+	assert_false(hero.is_burrowed, "UT-MAGIC-D01: 他の味方は潜行しない")
 	assert_eq(witch.stun_turns, 0, "UT-MAGIC-D01: 魔女はスタンしない")
-	
-	# Case 2: 魔女対象 -> 魔女スタン
+	assert_true(earth_girl.has_acted, "UT-MAGIC-D01: 詠唱者は行動済み")
+
+	# Case 2: 味方を対象 -> 味方が潜行、潜行中だった詠唱者は地上に出る
 	earth_girl.has_acted = false
-	var res2 = tm.execute_magic("GIRL_EARTH", Enums.ElementType.EARTH, Vector2i(2, 0))
-	assert_true(res2, "UT-MAGIC-D01: 魔女対象詠唱成功")
+	var res2 = tm.execute_earth("GIRL_EARTH", "HERO")
+	assert_true(res2, "UT-MAGIC-D01: 味方への詠唱成功")
+	assert_true(hero.is_burrowed, "UT-MAGIC-D01: 味方が潜行状態になること")
+	assert_false(earth_girl.is_burrowed, "UT-MAGIC-D01: 自分以外が対象なら詠唱者は潜行解除")
+	assert_eq(witch.stun_turns, 0, "UT-MAGIC-D01: 魔女はスタンしない")
+
+	# Case 3: 魔女を対象 -> 魔女スタン
+	earth_girl.has_acted = false
+	var res3 = tm.execute_earth("GIRL_EARTH", "WITCH")
+	assert_true(res3, "UT-MAGIC-D01: 魔女への詠唱成功")
 	assert_eq(witch.stun_turns, 1, "UT-MAGIC-D01: 魔女が1ターンスタンすること")
+	assert_false(earth_girl.is_burrowed, "UT-MAGIC-D01: 魔女が対象なら詠唱者は潜行しない")
 
 ## UT-MAGIC-N05: 移動完了による潜行解除
 func test_unburrow_on_movement() -> void:
@@ -455,3 +470,82 @@ func test_wind_range_boundary() -> void:
 	assert_false(targets.has("WITCH_2"), "UT-MAGIC-B03: 射程2で距離3は対象外")
 	assert_eq(tm.execute_wind("GIRL_WIND", "WITCH_2", Vector2i.RIGHT).get("result"), "ERROR", "UT-MAGIC-B03: 射程外への詠唱は失敗")
 	assert_eq(tm.execute_wind("GIRL_WIND", "WITCH_1", Vector2i.RIGHT).get("result"), "BLOWN", "UT-MAGIC-B03: 射程内への詠唱は成功")
+
+## UT-MAGIC-E08: 土魔術の不正な対象の拒否
+func test_earth_invalid_targets() -> void:
+	var tm = TurnManager.new()
+	var earth_girl = CharacterData.new("GIRL_EARTH", "土の少女", Vector2i(0, 0))
+	earth_girl.is_burrowed = true
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(1, 0))
+	hero.is_burrowed = true
+	var fire = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(2, 0))
+	fire.kill()
+	var stunned = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(3, 0))
+	stunned.stun_turns = 1
+	var defeated = EnemyData.new("WITCH_2", Enums.EnemyType.TRACKING, Vector2i(4, 0))
+	defeated.defeat()
+	tm.setup_stage(_make_wind_line(5), [hero, earth_girl, fire], [stunned, defeated], "STAGE_TEST")
+
+	var targets = tm.get_earth_targets("GIRL_EARTH")
+	assert_false(targets.has("GIRL_EARTH"), "UT-MAGIC-E08: 潜行中の詠唱者自身は対象外")
+	assert_false(targets.has("HERO"), "UT-MAGIC-E08: 潜行中の味方は対象外")
+	assert_false(targets.has("GIRL_FIRE"), "UT-MAGIC-E08: 死亡中の味方は対象外")
+	assert_false(targets.has("WITCH_1"), "UT-MAGIC-E08: スタン中の魔女は対象外")
+	assert_false(targets.has("WITCH_2"), "UT-MAGIC-E08: 撃破中の魔女は対象外")
+	assert_false(tm.execute_earth("GIRL_EARTH", "HERO"), "UT-MAGIC-E08: 潜行中の味方への詠唱は失敗")
+	assert_false(tm.execute_earth("GIRL_EARTH", "WITCH_1"), "UT-MAGIC-E08: スタン中の魔女への詠唱は失敗")
+	assert_false(tm.execute_earth("GIRL_EARTH", "UNKNOWN"), "UT-MAGIC-E08: 存在しない対象への詠唱は失敗")
+	assert_false(tm.execute_earth("UNKNOWN", "HERO"), "UT-MAGIC-E08: 存在しない詠唱者は失敗")
+	assert_false(earth_girl.has_acted, "UT-MAGIC-E08: 失敗時は行動済みにならない")
+	assert_true(earth_girl.is_burrowed, "UT-MAGIC-E08: 失敗時は詠唱者の潜行も変わらない")
+	assert_eq(stunned.stun_turns, 1, "UT-MAGIC-E08: スタンは重ならない")
+
+	hero.is_burrowed = false
+	earth_girl.has_acted = true
+	assert_false(tm.execute_earth("GIRL_EARTH", "HERO"), "UT-MAGIC-E08: 行動済みの詠唱者は失敗")
+	earth_girl.has_acted = false
+	assert_false(tm.execute_magic("GIRL_EARTH", Enums.ElementType.EARTH, Vector2i(1, 0)), "UT-MAGIC-E08: execute_magicでの土魔術は受け付けない（execute_earthを使う）")
+	assert_false(hero.is_burrowed, "UT-MAGIC-E08: execute_magicで土を指定しても効果は出ない")
+
+## UT-MAGIC-B04: 土魔術の射程境界（射程6：距離6は対象可・距離7は不可）
+func test_earth_range_boundary() -> void:
+	var tm = TurnManager.new()
+	var earth_girl = CharacterData.new("GIRL_EARTH", "土の少女", Vector2i(0, 0))
+	var w6 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(6, 0))
+	var w7 = EnemyData.new("WITCH_2", Enums.EnemyType.TRACKING, Vector2i(7, 0))
+	tm.setup_stage(_make_wind_line(8), [earth_girl], [w6, w7], "STAGE_TEST")
+
+	assert_eq(TurnManager.EARTH_RANGE, 6, "UT-MAGIC-B04: 既定の射程は6")
+	var targets = tm.get_earth_targets("GIRL_EARTH")
+	assert_true(targets.has("WITCH_1"), "UT-MAGIC-B04: 距離6は対象可")
+	assert_false(targets.has("WITCH_2"), "UT-MAGIC-B04: 距離7は対象外")
+	assert_true(targets.has("GIRL_EARTH"), "UT-MAGIC-B04: 距離0の自分自身は対象可")
+	assert_false(tm.execute_earth("GIRL_EARTH", "WITCH_2"), "UT-MAGIC-B04: 射程外への詠唱は失敗")
+	assert_true(tm.execute_earth("GIRL_EARTH", "WITCH_1"), "UT-MAGIC-B04: 射程内への詠唱は成功")
+
+## UT-MAGIC-N10: スタン中の魔女は無害（踏んでも捕まらない・風で飛ばしてもぶつからない）
+func test_stunned_witch_is_harmless() -> void:
+	# 1歩移動でスタン中の魔女のマスに入っても捕まらない
+	var tm = TurnManager.new()
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(0, 0))
+	var girl = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(4, 0))
+	var witch = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(1, 0))
+	witch.stun_turns = 1
+	tm.setup_stage(_make_wind_line(5), [hero, girl], [witch], "STAGE_TEST")
+	var r1 = tm.step_unit(hero, Vector2i(1, 0), 1)
+	assert_eq(r1.get("result"), "CONTINUE", "UT-MAGIC-N10: スタン中の魔女のマスは通過できる")
+	assert_ne(tm.current_phase, Enums.TurnPhase.GAME_OVER, "UT-MAGIC-N10: 主人公は捕まらない")
+	var r2 = tm.step_unit(girl, Vector2i(1, 0), 0)
+	assert_eq(r2.get("result"), "ARRIVED", "UT-MAGIC-N10: スタン中の魔女のマスに止まれる")
+	assert_true(girl.is_alive, "UT-MAGIC-N10: 少女は捕まらない")
+
+	# 風魔術で飛ばしたキャラもスタン中の魔女にはぶつからず、そのマスに着地もできる
+	var tm2 = TurnManager.new()
+	var wind_girl = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(0, 0))
+	var hero2 = CharacterData.new("HERO", "主人公", Vector2i(1, 0))
+	var w2 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(3, 0))
+	w2.stun_turns = 1
+	tm2.setup_stage(_make_wind_line(4), [hero2, wind_girl], [w2], "STAGE_TEST")
+	var r3 = tm2.execute_wind("GIRL_WIND", "HERO", Vector2i.RIGHT)
+	assert_eq(r3.get("result"), "BLOWN", "UT-MAGIC-N10: スタン中の魔女にはぶつからない")
+	assert_eq(hero2.current_coord, Vector2i(3, 0), "UT-MAGIC-N10: スタン中の魔女のマスに着地できる")
