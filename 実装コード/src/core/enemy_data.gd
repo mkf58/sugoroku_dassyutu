@@ -9,7 +9,8 @@ var is_alive: bool = true
 var revive_turn_count: int = 0      ## 炎魔法で撃破された後の復活カウンタ（2ターン）
 var patrol_coords: Array[Vector2i] = []
 var patrol_index: int = 0
-var stun_turns: int = 0             ## 土魔法による行動不能ターン（1ターン）
+var stun_turns: int = 0             ## 土魔法による行動不能の残りターン（詠唱時2。ターン終了時に1減る）
+var stun_immune_turns: int = 0      ## スタン解除直後の再スタン不可ターン（解除時1。ターン終了時に1減る）
 
 func _init(p_id: String, p_type: Enums.EnemyType, p_coord: Vector2i) -> void:
     enemy_id = p_id
@@ -19,10 +20,17 @@ func _init(p_id: String, p_type: Enums.EnemyType, p_coord: Vector2i) -> void:
     is_alive = true
     revive_turn_count = 0
     stun_turns = 0
+    stun_immune_turns = 0
+
+## 捕縛判定を持つ状態か（生存中かつスタンしていない）。スタン中の魔女は無害
+func is_dangerous() -> bool:
+    return is_alive and stun_turns <= 0
 
 func defeat() -> void:
     is_alive = false
     revive_turn_count = 2
+    stun_turns = 0
+    stun_immune_turns = 0
 
 func tick_revive() -> bool:
     if not is_alive and revive_turn_count > 0:

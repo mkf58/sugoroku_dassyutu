@@ -115,13 +115,37 @@
 | **準正常系** | **UT-MAGIC-E03** | `test_magic_fails_caster_not_found` | 未登録のキャラクターIDで詠唱 | 詠唱拒否（戻り値 `false`） |
 | **準正常系** | **UT-MAGIC-E04** | `test_fire_magic_fails_no_target` | 対象座標に魔女が存在しない | 詠唱失敗（戻り値 `false`） |
 | **境界値** | **UT-MAGIC-B01** | `test_fire_magic_range_boundary` | 距離 2（境界内） vs 距離 3（境界外） | 距離2は成功、距離3は失敗すること |
-| **デシジョン** | **UT-MAGIC-D01** | `test_earth_magic_burrow_and_stun` | 対象座標の内容（空きマス vs 魔女、下記テーブル参照） | 自身の地中潜行 または 魔女スタンが排他発動 |
+| **正常系** | **UT-MAGIC-N06** | `test_water_trap_targets_normal_cells_only` | 全マス種別を並べた盤面で設置可能マスを取得し、魔女のいるNORMALマスへ詠唱 | 設置可能マスは NORMAL のみ（足元・魔女のいるマスを含む）。指定マスだけが `WATER_TRAP` になり、足元は変化しない |
+| **準正常系** | **UT-MAGIC-E05** | `test_water_magic_fails_on_special_cell` | EXIT・EVENT・+2・戻る・休み・もう1回・設置済み水罠の各マスへ詠唱 | 詠唱失敗（`false`）、マス種別は不変、詠唱者は未行動のまま |
+| **準正常系** | **UT-MAGIC-E06** | `test_water_magic_fails_on_missing_cell` | 盤面にない座標への詠唱／未登録の詠唱者 | 詠唱失敗、詠唱者は未行動のまま。未登録の詠唱者は設置可能マスが空 |
+| **境界値** | **UT-MAGIC-B02** | `test_water_magic_range_boundary` | 既定射程（`WATER_TRAP_RANGE = -1`）と、射程2に変更した場合 | 既定は全範囲。射程2では距離2は設置可・距離3は不可、設置可能マスは3マス |
+| **正常系** | **UT-MAGIC-N07** | `test_wind_blows_unit_to_farthest_cell` | 一直線＋枝道の盤面で主人公を右へ／潜行中の詠唱者が自分自身を右へ | 枝道に曲がらず最遠マスへ移動、経路は出発点〜着地点、詠唱者は行動済み。自分自身も対象にでき、詠唱で潜行解除 |
+| **正常系** | **UT-MAGIC-N08** | `test_wind_hero_hits_witch_game_over` | 主人公を飛ばす進路上に魔女 | 魔女のマスで止まり `GAME_OVER`、`game_over_triggered` を1回発行 |
+| **正常系** | **UT-MAGIC-N09** | `test_wind_ignores_cell_effects` | 進路の途中に水罠、着地マスがEXIT／イベント | 水罠を素通りし、EXITでもクリアにならず、イベントも未消費のまま |
+| **準正常系** | **UT-MAGIC-E07** | `test_wind_invalid_targets` | 潜行中・死亡中・撃破中・未登録の対象、未登録・行動済みの詠唱者、動けない方向・斜め方向、`execute_magic` での風指定 | すべて `ERROR`（または `false`）で、詠唱者は移動・行動済みにならない |
+| **境界値** | **UT-MAGIC-B03** | `test_wind_range_boundary` | 既定射程（`WIND_RANGE = -1`）と、射程2に変更した場合 | 既定は全範囲。射程2では距離2は対象可・距離3は対象外 |
+| **デシジョン** | **UT-MAGIC-D02** | `test_wind_collision_decision` | 下記テーブル参照 | 進路・着地の衝突が仕様どおりに解決される |
+| **デシジョン** | **UT-MAGIC-D01** | `test_earth_magic_burrow_and_stun` | `execute_earth` の対象（自分自身 / 味方 / 魔女、下記テーブル参照） | 対象の潜行 または 魔女スタンが排他発動 |
+| **準正常系** | **UT-MAGIC-E08** | `test_earth_invalid_targets` | 潜行中の自分・味方、死亡中の味方、スタン中・撃破中の魔女、未登録の対象・詠唱者、行動済みの詠唱者、`execute_magic` での土指定 | すべて失敗し、詠唱者の行動済み・潜行は変わらず、スタンも重ならない |
+| **境界値** | **UT-MAGIC-B04** | `test_earth_range_boundary` | 射程（`EARTH_RANGE = 6`）で距離6と距離7の魔女 | 距離6は対象可、距離7は対象外。距離0の自分自身は対象可 |
+| **準正常系** | **UT-MAGIC-E09** | `test_earth_cannot_stun_consecutively` | スタン→2回のターン終了で解除→解除直後のターン→さらに1ターン後、および撃破 | 解除直後のターンは対象外・詠唱失敗（味方への詠唱は可）。その次のターンから再びスタンできる。撃破でスタン・再スタン不可はリセット |
+| **正常系** | **UT-MAGIC-N10** | `test_stunned_witch_is_harmless` | スタン中の魔女のマスへ1歩移動／停止、風魔術で飛ばしたキャラの進路にスタン中の魔女 | 捕まらずに通過・停止できる。風魔術でもぶつからず、そのマスに着地できる |
 
 #### 【デシジョンテーブル：UT-MAGIC-D01 土魔法の効果分岐】
-| 対象座標の内容 | 詠唱者の潜行状態 (`is_burrowed`) | 魔女のスタンターン (`stun_turns`) | 備考 |
-| :--- | :---: | :---: | :--- |
-| 魔女が存在する座標 | 変化なし (`false`) | **`stun_turns = 1`** | 魔女の足止め（次ターン移動スキップ） |
-| 空きマス（または味方座標） | **`is_burrowed = true`** | 変化なし | 地中潜行（魔女やり過ごしモード） |
+| 対象 | 対象の潜行状態 | 詠唱者の潜行状態 | 魔女のスタンターン (`stun_turns`) | 備考 |
+| :--- | :---: | :---: | :---: | :--- |
+| 自分自身 | **`is_burrowed = true`** | （対象と同じ） | 変化なし | 地中潜行（魔女やり過ごしモード） |
+| 味方 | **`is_burrowed = true`** | 解除（`false`） | 変化なし | 味方を潜らせる。詠唱者は地上に出る |
+| 魔女 | － | 解除（`false`） | **`stun_turns = 2`** | 魔女の足止め（詠唱したターンと次のターンの魔女ターンを2回休み） |
+
+#### 【デシジョンテーブル：UT-MAGIC-D02 風魔術の衝突判定】
+| Case | 飛ばすユニット | 進路・着地の状況 | 結果 |
+| :--- | :--- | :--- | :--- |
+| 1 | 少女 | 進路上に魔女 | 魔女のマスで止まり捕縛（`GIRL_DIED`、ゲームオーバーにはならない） |
+| 2 | 魔女 | 進路上に主人公 | すり抜けて最遠マスへ。主人公は捕まらない |
+| 3 | 主人公 | 進路上に味方 | すり抜けて最遠マスへ |
+| 4 | 魔女 | 着地マスに詠唱者、その手前に別の魔女 | 空いているマスまで手前に戻って着地 |
+| 5 | 主人公 | 手前に戻ると出発点になる | その方向は選べない（反対方向は選べる） |
 
 ---
 
@@ -138,6 +162,20 @@
 | **正常系** | **UT-TURN-N04** | `test_multiple_allies_sequential_action` | 主人公行動後に未行動の少女が存在 | 主人公が選択不可になり、少女が選択可能。次ターンで両者リセット |
 | **正常系** | **UT-TURN-N05** | `test_girl_death_during_step_movement` | 少女が魔女のいるマスへ1歩侵入 | 戻り値 `GIRL_DIED`、少女のみ死亡（カウント3）、ゲームオーバーにならない |
 | **境界値** | **UT-TURN-B01** | `test_revive_exact_turn_boundary` | 復活カウント 1（前ターン） vs 0（完了時） | カウント1では依然死亡、0になった瞬間に完全復活 |
+| **正常系** | **UT-TURN-N06** | `test_revived_witch_captures_girl` | 魔女（復活カウント1）の初期位置に少女が停止中でターン終了 | 魔女復活と同時に少女が捕縛（カウント3、`unit_killed` 発行）。ゲームオーバーにならず次ターンへ進む |
+| **正常系** | **UT-TURN-N07** | `test_revived_witch_captures_hero_game_over` | 魔女（復活カウント1）の初期位置に主人公が停止中でターン終了 | `GAME_OVER` へ遷移し `game_over_triggered` を1回発行。次のプレイヤーターンは始めない（ターン数据え置き） |
+| **デシジョン** | **UT-TURN-D01** | `test_revive_capture_decision` | 下記テーブル参照 | 復活した瞬間に復活位置にいる地上のキャラだけが捕縛される |
+| **正常系** | **UT-TURN-N08** | `test_stun_decrements_on_turn_end` | スタン1の魔女でターン終了を2回 | 1回目で0になり、2回目も0のまま（負にならない） |
+| **正常系** | **UT-TURN-N10** | `test_earth_stun_lasts_two_enemy_turns` | 土魔術で魔女をスタンさせてターン終了を2回 | 2→1→0。1回目のターン終了後（次のプレイヤーターン）も無害、解除後は捕縛判定あり |
+| **正常系** | **UT-TURN-N09** | `test_stun_end_captures_unit_on_same_cell` | スタンが解ける魔女と同じマスに少女／潜行中の少女／主人公、スタン2の魔女と同じマスに少女 | 解けた瞬間に地上の少女は捕縛、潜行中はやり過ごし、主人公はゲームオーバー。スタンが残る間は捕縛しない |
+
+#### 【デシジョンテーブル：UT-TURN-D01 魔女復活時の捕縛判定】
+| Case | 魔女の状態 | キャラの位置 | キャラの潜行状態 | 結果 |
+| :--- | :--- | :--- | :---: | :--- |
+| 1 | このターンで復活 | 復活位置 | 潜行中 | やり過ごし（`burrow_pass_succeeded` 発行、生存） |
+| 2 | このターンで復活 | 復活位置以外 | 地上 | 捕縛されない |
+| 3 | まだ復活しない（カウント2→1） | 復活位置 | 地上 | 捕縛されない |
+| 4 | 撃破されていない（同じマスにいる） | 同じマス | 地上 | ターン終了処理では捕縛しない（復活ではないため） |
 
 ---
 
@@ -162,6 +200,7 @@
 | **準正常系** | **UT-SCENE-E01** | `test_prevent_double_transition` | 遷移中フラグ `is_transitioning = true` の状態で再度 `change_scene` 呼び出し | 重複実行が無視（スキップ）され、最初の遷移先が保持されること |
 | **準正常系** | **UT-SCENE-E02** | `test_invalid_param_key` | 未設定のパラメータキーを `get_param("unknown", "default_val")` で取得 | 指定したデフォルト値 `"default_val"` が安全に返却されること |
 | **境界値** | **UT-SCENE-B01** | `test_empty_params_dictionary` | パラメータに空の辞書 `{}` を渡して遷移 | エラーなく受け付けられ、パラメータがクリア/空辞書となること |
+| **正常系** | **UT-SCENE-N04** | `test_unit_piece_does_not_block_clicks` | `unit_piece.tscn` をインスタンス化し、子の Control を走査 | すべて `MOUSE_FILTER_IGNORE`（コマの上のクリックが下のマスに届く） |
 
 ---
 
@@ -203,6 +242,7 @@
 | ID | 観点 | 内容 |
 | --- | --- | --- |
 | UT-SUSP-N01 | N | ターン数・ユニット状態（座標・生死・復活カウンタ・休み・スタン・巡回）のスナップショット |
+| UT-SUSP-N07 | N | 再スタン不可ターン（`stun_immune_turns`）の保存・JSON経由の復元。キーのない古いデータは0 |
 | UT-SUSP-N02 | N | 初期盤面との差分マス（消費済み・水トラップ）のみ保存 |
 | UT-SUSP-N03 | N | 復元で盤面状態が再現される |
 | UT-SUSP-N04 | N | JSON経由でも型（int・Vector2i）が正しく復元される |
