@@ -17,6 +17,12 @@ func run_all() -> void:
 	test_water_magic_fails_on_special_cell()
 	test_water_magic_fails_on_missing_cell()
 	test_water_magic_range_boundary()
+	test_wind_blows_unit_to_farthest_cell()
+	test_wind_hero_hits_witch_game_over()
+	test_wind_collision_decision()
+	test_wind_ignores_cell_effects()
+	test_wind_invalid_targets()
+	test_wind_range_boundary()
 
 ## UT-MAGIC-N01: 炎魔法による魔女撃破
 func test_fire_magic_defeats_witch() -> void:
@@ -258,3 +264,194 @@ func test_water_magic_range_boundary() -> void:
 	assert_eq(tm.get_water_trap_targets("GIRL_WATER").size(), 3, "UT-MAGIC-B02: 射程2の設置可能マスは距離0〜2の3マス")
 	assert_false(tm.execute_magic("GIRL_WATER", Enums.ElementType.WATER, Vector2i(3, 0)), "UT-MAGIC-B02: 射程外への詠唱は失敗")
 	assert_true(tm.execute_magic("GIRL_WATER", Enums.ElementType.WATER, Vector2i(2, 0)), "UT-MAGIC-B02: 射程内への詠唱は成功")
+
+## 風魔術テスト用の盤面：(0,0)〜(n-1,0) の一直線（すべてNORMAL）
+func _make_wind_line(n: int) -> GridBoard:
+	var types: Array = []
+	for i in range(n):
+		types.append(Enums.CellType.NORMAL)
+	return _make_water_board(types)
+
+## UT-MAGIC-N07: 風魔術で指定ユニットを指定方向の最遠マスへ吹き飛ばす（自分自身も対象可）
+func test_wind_blows_unit_to_farthest_cell() -> void:
+	var tm = TurnManager.new()
+	var board = _make_wind_line(5)
+	# (2,0) から下に1マスだけ伸びる枝：右方向の通路とは別
+	board.add_cell(CellData.new(Vector2i(2, 1), Enums.CellType.NORMAL))
+	board.connect_cells(Vector2i(2, 0), Vector2i(2, 1))
+	var wind_girl = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(0, 0))
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(1, 0))
+	tm.setup_stage(board, [hero, wind_girl], [], "STAGE_TEST")
+
+	var targets = tm.get_wind_targets("GIRL_WIND")
+	assert_true(targets.has("HERO"), "UT-MAGIC-N07: 主人公を対象にできる")
+	assert_true(targets.has("GIRL_WIND"), "UT-MAGIC-N07: 詠唱者自身を対象にできる")
+	var dirs = tm.get_wind_directions("HERO")
+	assert_true(dirs.has(Vector2i.RIGHT), "UT-MAGIC-N07: 右に飛ばせる")
+	assert_false(dirs.has(Vector2i.LEFT), "UT-MAGIC-N07: 左は詠唱者のいる(0,0)しかなく着地できないため選べない")
+	assert_false(dirs.has(Vector2i.UP), "UT-MAGIC-N07: 通路のない上には飛ばせない")
+
+	var res = tm.execute_wind("GIRL_WIND", "HERO", Vector2i.RIGHT)
+	assert_eq(res.get("result"), "BLOWN", "UT-MAGIC-N07: 吹き飛ばし成功")
+	assert_eq(hero.current_coord, Vector2i(4, 0), "UT-MAGIC-N07: 枝道に曲がらず最遠マス(4,0)まで飛ぶ")
+	assert_eq(res.get("path"), [Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0), Vector2i(4, 0)], "UT-MAGIC-N07: 経路は出発点から着地点まで")
+	assert_true(wind_girl.has_acted, "UT-MAGIC-N07: 詠唱者は行動済み")
+	assert_true(hero.is_alive, "UT-MAGIC-N07: 主人公は無事")
+
+	# 自分自身を吹き飛ばす（潜行中でも詠唱で地上に出るため対象にできる）
+	var tm2 = TurnManager.new()
+	var girl2 = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(0, 0))
+	girl2.is_burrowed = true
+	tm2.setup_stage(_make_wind_line(4), [girl2], [], "STAGE_TEST")
+	assert_true(tm2.get_wind_targets("GIRL_WIND").has("GIRL_WIND"), "UT-MAGIC-N07: 潜行中の詠唱者自身は対象にできる")
+	var res2 = tm2.execute_wind("GIRL_WIND", "GIRL_WIND", Vector2i.RIGHT)
+	assert_eq(res2.get("result"), "BLOWN", "UT-MAGIC-N07: 自分自身の吹き飛ばし成功")
+	assert_eq(girl2.current_coord, Vector2i(3, 0), "UT-MAGIC-N07: 自分が最遠マスへ移動")
+	assert_false(girl2.is_burrowed, "UT-MAGIC-N07: 詠唱で潜行解除")
+
+## UT-MAGIC-N08: 主人公を吹き飛ばして魔女にぶつかるとゲームオーバー
+func test_wind_hero_hits_witch_game_over() -> void:
+	var tm = TurnManager.new()
+	var wind_girl = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(0, 0))
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(1, 0))
+	var witch = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(3, 0))
+	tm.setup_stage(_make_wind_line(5), [hero, wind_girl], [witch], "STAGE_TEST")
+	var reasons: Array = []
+	tm.game_over_triggered.connect(func(r): reasons.append(r))
+
+	var res = tm.execute_wind("GIRL_WIND", "HERO", Vector2i.RIGHT)
+	assert_eq(res.get("result"), "GAME_OVER", "UT-MAGIC-N08: 戻り値GAME_OVER")
+	assert_eq(hero.current_coord, Vector2i(3, 0), "UT-MAGIC-N08: 魔女のマスで止まる")
+	assert_eq(tm.current_phase, Enums.TurnPhase.GAME_OVER, "UT-MAGIC-N08: ゲームオーバーへ遷移")
+	assert_eq(reasons.size(), 1, "UT-MAGIC-N08: game_over_triggeredが1回発行される")
+
+## UT-MAGIC-D02: デシジョンテーブル：風魔術の進路・着地の衝突判定
+func test_wind_collision_decision() -> void:
+	# Case 1: 少女を飛ばして進路上の魔女にぶつかる -> 魔女のマスで止まり捕縛
+	var tm1 = TurnManager.new()
+	var caster1 = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(0, 0))
+	var fire1 = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(1, 0))
+	var w1 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(3, 0))
+	tm1.setup_stage(_make_wind_line(5), [caster1, fire1], [w1], "STAGE_TEST")
+	var killed: Array = []
+	tm1.unit_killed.connect(func(uid): killed.append(uid))
+	var r1 = tm1.execute_wind("GIRL_WIND", "GIRL_FIRE", Vector2i.RIGHT)
+	assert_eq(r1.get("result"), "GIRL_DIED", "UT-MAGIC-D02: Case1 戻り値GIRL_DIED")
+	assert_eq(fire1.current_coord, Vector2i(3, 0), "UT-MAGIC-D02: Case1 魔女のマスで止まる")
+	assert_false(fire1.is_alive, "UT-MAGIC-D02: Case1 少女が捕縛される")
+	assert_eq(killed, ["GIRL_FIRE"], "UT-MAGIC-D02: Case1 unit_killedが発行される")
+	assert_ne(tm1.current_phase, Enums.TurnPhase.GAME_OVER, "UT-MAGIC-D02: Case1 ゲームオーバーにはならない")
+
+	# Case 2: 魔女を飛ばして進路上のキャラとすれ違う -> すり抜け、誰も捕まらない
+	var tm2 = TurnManager.new()
+	var caster2 = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(0, 0))
+	var hero2 = CharacterData.new("HERO", "主人公", Vector2i(3, 0))
+	var w2 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(1, 0))
+	tm2.setup_stage(_make_wind_line(5), [hero2, caster2], [w2], "STAGE_TEST")
+	var r2 = tm2.execute_wind("GIRL_WIND", "WITCH_1", Vector2i.RIGHT)
+	assert_eq(r2.get("result"), "BLOWN", "UT-MAGIC-D02: Case2 戻り値BLOWN")
+	assert_eq(w2.current_coord, Vector2i(4, 0), "UT-MAGIC-D02: Case2 魔女はキャラをすり抜けて最遠マスへ")
+	assert_true(hero2.is_alive, "UT-MAGIC-D02: Case2 すれ違った主人公は捕まらない")
+	assert_ne(tm2.current_phase, Enums.TurnPhase.GAME_OVER, "UT-MAGIC-D02: Case2 ゲームオーバーにならない")
+
+	# Case 3: キャラを飛ばして進路上の味方とすれ違う -> すり抜け
+	var tm3 = TurnManager.new()
+	var caster3 = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(2, 0))
+	var hero3 = CharacterData.new("HERO", "主人公", Vector2i(0, 0))
+	tm3.setup_stage(_make_wind_line(5), [hero3, caster3], [], "STAGE_TEST")
+	var r3 = tm3.execute_wind("GIRL_WIND", "HERO", Vector2i.RIGHT)
+	assert_eq(r3.get("result"), "BLOWN", "UT-MAGIC-D02: Case3 戻り値BLOWN")
+	assert_eq(hero3.current_coord, Vector2i(4, 0), "UT-MAGIC-D02: Case3 味方をすり抜けて最遠マスへ")
+
+	# Case 4: 着地マスに別のユニットがいる -> 空いているマスまで手前に戻る
+	var tm4 = TurnManager.new()
+	var caster4 = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(4, 0))
+	var hero4 = CharacterData.new("HERO", "主人公", Vector2i(0, 0))
+	var w4 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(1, 0))
+	var w4b = EnemyData.new("WITCH_2", Enums.EnemyType.TRACKING, Vector2i(3, 0))
+	tm4.setup_stage(_make_wind_line(5), [hero4, caster4], [w4, w4b], "STAGE_TEST")
+	var r4 = tm4.execute_wind("GIRL_WIND", "WITCH_1", Vector2i.RIGHT)
+	assert_eq(r4.get("result"), "BLOWN", "UT-MAGIC-D02: Case4 戻り値BLOWN")
+	assert_eq(w4.current_coord, Vector2i(2, 0), "UT-MAGIC-D02: Case4 (4,0)詠唱者・(3,0)魔女を避けて(2,0)に着地")
+	assert_eq(r4.get("path"), [Vector2i(1, 0), Vector2i(2, 0)], "UT-MAGIC-D02: Case4 経路は着地点まで")
+
+	# Case 5: 手前に戻ると出発点になる方向は選べない
+	var tm5 = TurnManager.new()
+	var caster5 = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(2, 0))
+	var hero5 = CharacterData.new("HERO", "主人公", Vector2i(1, 0))
+	tm5.setup_stage(_make_wind_line(3), [hero5, caster5], [], "STAGE_TEST")
+	assert_false(tm5.get_wind_directions("HERO").has(Vector2i.RIGHT), "UT-MAGIC-D02: Case5 着地点が埋まり動けない方向は選べない")
+	assert_true(tm5.get_wind_directions("HERO").has(Vector2i.LEFT), "UT-MAGIC-D02: Case5 反対方向は選べる")
+
+## UT-MAGIC-N09: 風魔術では途中の水罠も着地マスの効果も発動しない
+func test_wind_ignores_cell_effects() -> void:
+	var tm = TurnManager.new()
+	var board = _make_water_board([Enums.CellType.NORMAL, Enums.CellType.NORMAL, Enums.CellType.WATER_TRAP, Enums.CellType.EXIT])
+	var wind_girl = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(0, 0))
+	var hero = CharacterData.new("HERO", "主人公", Vector2i(1, 0))
+	tm.setup_stage(board, [hero, wind_girl], [], "STAGE_TEST")
+	var cleared: Array = []
+	tm.stage_cleared.connect(func(sid): cleared.append(sid))
+	var res = tm.execute_wind("GIRL_WIND", "HERO", Vector2i.RIGHT)
+	assert_eq(res.get("result"), "BLOWN", "UT-MAGIC-N09: 戻り値BLOWN")
+	assert_eq(hero.current_coord, Vector2i(3, 0), "UT-MAGIC-N09: 水罠を素通りしてEXITまで飛ぶ")
+	assert_eq(cleared.size(), 0, "UT-MAGIC-N09: EXITに着地してもクリアにならない")
+	assert_ne(tm.current_phase, Enums.TurnPhase.STAGE_CLEAR, "UT-MAGIC-N09: フェーズはSTAGE_CLEARにならない")
+
+	var tm2 = TurnManager.new()
+	var board2 = _make_water_board([Enums.CellType.NORMAL, Enums.CellType.NORMAL, Enums.CellType.EVENT])
+	var girl2 = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(0, 0))
+	var hero2 = CharacterData.new("HERO", "主人公", Vector2i(1, 0))
+	tm2.setup_stage(board2, [hero2, girl2], [], "STAGE_TEST")
+	tm2.execute_wind("GIRL_WIND", "HERO", Vector2i.RIGHT)
+	assert_eq(hero2.current_coord, Vector2i(2, 0), "UT-MAGIC-N09: イベントマスに着地")
+	assert_false(board2.get_cell(Vector2i(2, 0)).is_consumed, "UT-MAGIC-N09: イベントは発動しない（未消費のまま）")
+
+## UT-MAGIC-E07: 風魔術の不正な対象・方向の拒否
+func test_wind_invalid_targets() -> void:
+	var tm = TurnManager.new()
+	var wind_girl = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(0, 0))
+	var earth = CharacterData.new("GIRL_EARTH", "土の少女", Vector2i(1, 0))
+	earth.is_burrowed = true
+	var fire = CharacterData.new("GIRL_FIRE", "炎の少女", Vector2i(2, 0))
+	fire.kill()
+	var witch = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(3, 0))
+	witch.defeat()
+	tm.setup_stage(_make_wind_line(5), [wind_girl, earth, fire], [witch], "STAGE_TEST")
+
+	var targets = tm.get_wind_targets("GIRL_WIND")
+	assert_false(targets.has("GIRL_EARTH"), "UT-MAGIC-E07: 潜行中のユニットは対象外")
+	assert_false(targets.has("GIRL_FIRE"), "UT-MAGIC-E07: 死亡中のユニットは対象外")
+	assert_false(targets.has("WITCH_1"), "UT-MAGIC-E07: 撃破中の魔女は対象外")
+	assert_eq(tm.execute_wind("GIRL_WIND", "GIRL_EARTH", Vector2i.RIGHT).get("result"), "ERROR", "UT-MAGIC-E07: 潜行中ユニットへの詠唱は失敗")
+	assert_eq(tm.execute_wind("GIRL_WIND", "GIRL_FIRE", Vector2i.RIGHT).get("result"), "ERROR", "UT-MAGIC-E07: 死亡中ユニットへの詠唱は失敗")
+	assert_eq(tm.execute_wind("GIRL_WIND", "UNKNOWN", Vector2i.RIGHT).get("result"), "ERROR", "UT-MAGIC-E07: 存在しない対象への詠唱は失敗")
+	assert_eq(tm.execute_wind("UNKNOWN", "GIRL_WIND", Vector2i.RIGHT).get("result"), "ERROR", "UT-MAGIC-E07: 存在しない詠唱者は失敗")
+	assert_eq(tm.execute_wind("GIRL_WIND", "GIRL_WIND", Vector2i.LEFT).get("result"), "ERROR", "UT-MAGIC-E07: 1マスも動けない方向は失敗")
+	assert_eq(tm.execute_wind("GIRL_WIND", "GIRL_WIND", Vector2i(1, 1)).get("result"), "ERROR", "UT-MAGIC-E07: 上下左右以外の方向は失敗")
+	assert_false(wind_girl.has_acted, "UT-MAGIC-E07: 失敗時は行動済みにならない")
+	assert_eq(wind_girl.current_coord, Vector2i(0, 0), "UT-MAGIC-E07: 失敗時は移動しない")
+
+	wind_girl.has_acted = true
+	assert_eq(tm.execute_wind("GIRL_WIND", "GIRL_WIND", Vector2i.RIGHT).get("result"), "ERROR", "UT-MAGIC-E07: 行動済みの詠唱者は失敗")
+	wind_girl.has_acted = false
+	assert_false(tm.execute_magic("GIRL_WIND", Enums.ElementType.WIND, Vector2i(0, 0)), "UT-MAGIC-E07: execute_magicでの風魔術は受け付けない（execute_windを使う）")
+	assert_false(wind_girl.has_acted, "UT-MAGIC-E07: execute_magicで風を指定しても行動済みにならない")
+
+## UT-MAGIC-B03: 風魔術の射程境界（射程2：距離2は対象可・距離3は不可／-1は全範囲）
+func test_wind_range_boundary() -> void:
+	var tm = TurnManager.new()
+	var wind_girl = CharacterData.new("GIRL_WIND", "風の少女", Vector2i(0, 0))
+	var w2 = EnemyData.new("WITCH_1", Enums.EnemyType.TRACKING, Vector2i(2, 0))
+	var w3 = EnemyData.new("WITCH_2", Enums.EnemyType.TRACKING, Vector2i(3, 0))
+	tm.setup_stage(_make_wind_line(6), [wind_girl], [w2, w3], "STAGE_TEST")
+
+	assert_eq(TurnManager.WIND_RANGE, -1, "UT-MAGIC-B03: 既定の射程は全範囲(-1)")
+	assert_true(tm.get_wind_targets("GIRL_WIND").has("WITCH_2"), "UT-MAGIC-B03: 全範囲なら距離3も対象可")
+
+	tm.wind_range = 2
+	var targets = tm.get_wind_targets("GIRL_WIND")
+	assert_true(targets.has("WITCH_1"), "UT-MAGIC-B03: 射程2で距離2は対象可")
+	assert_false(targets.has("WITCH_2"), "UT-MAGIC-B03: 射程2で距離3は対象外")
+	assert_eq(tm.execute_wind("GIRL_WIND", "WITCH_2", Vector2i.RIGHT).get("result"), "ERROR", "UT-MAGIC-B03: 射程外への詠唱は失敗")
+	assert_eq(tm.execute_wind("GIRL_WIND", "WITCH_1", Vector2i.RIGHT).get("result"), "BLOWN", "UT-MAGIC-B03: 射程内への詠唱は成功")

@@ -19,8 +19,12 @@ signal returned_to_start_applied(unit_id: String)
 
 ## 水魔術の射程（詠唱者から通路をたどった距離）。-1 は全範囲
 const WATER_TRAP_RANGE: int = -1
+## 風魔術の射程（詠唱者から対象ユニットまで通路をたどった距離）。-1 は全範囲
+const WIND_RANGE: int = -1
+const WIND_DIRECTIONS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
 var water_trap_range: int = WATER_TRAP_RANGE
+var wind_range: int = WIND_RANGE
 var board: GridBoard
 var characters: Dictionary = {}  ## id -> CharacterData
 var enemies: Dictionary = {}     ## id -> EnemyData
@@ -200,10 +204,9 @@ func execute_magic(character_id: String, element: Enums.ElementType, target_coor
             return true
             
         Enums.ElementType.WIND:
-            # 直線吹き飛ばし
-            caster.has_acted = true
-            emit_signal("magic_executed", element, character_id, target_coord)
-            return true
+            # 風魔術は対象ユニットと方向が必要なため execute_wind を使う
+            DebugLogger.error("TurnManager.execute_magic", "風魔術は execute_wind で実行してください", {"id": character_id})
+            return false
             
         _:
             DebugLogger.error("TurnManager.execute_magic", "未定義の魔法属性です", {"element": element})
@@ -212,28 +215,37 @@ func execute_magic(character_id: String, element: Enums.ElementType, target_coor
     return false
 
 
+## origin から通路をたどった距離が max_range 以内のマス集合（Vector2i -> true）。max_range < 0 は全マス
+func _get_cells_in_range(origin: Vector2i, max_range: int) -> Dictionary:
+    var result: Dictionary = {}
+    if board == null:
+        return result
+    if max_range < 0:
+        for coord in board.cells.keys():
+            result[coord] = true
+        return result
+    if not board.has_cell(origin):
+        return result
+    var dist: Dictionary = {origin: 0}
+    var queue: Array[Vector2i] = [origin]
+    while queue.size() > 0:
+        var current: Vector2i = queue.pop_front()
+        if dist[current] >= max_range:
+            continue
+        for n in board.get_accessible_neighbors(current):
+            if not dist.has(n):
+                dist[n] = dist[current] + 1
+                queue.append(n)
+    for coord in dist.keys():
+        result[coord] = true
+    return result
+
 ## 水魔術トラップの設置可能マス一覧（射程内の NORMAL マス。詠唱者の足元・ユニットのいるマスも含む）
 func get_water_trap_targets(caster_id: String) -> Array[Vector2i]:
     var targets: Array[Vector2i] = []
     if board == null or not characters.has(caster_id):
         return targets
-    var origin: Vector2i = characters[caster_id].current_coord
-    var in_range: Dictionary = {}
-    if water_trap_range < 0:
-        for coord in board.cells.keys():
-            in_range[coord] = true
-    elif board.has_cell(origin):
-        # 通路をたどった距離で射程内のマスを求める（BFS）
-        in_range[origin] = 0
-        var queue: Array[Vector2i] = [origin]
-        while queue.size() > 0:
-            var current: Vector2i = queue.pop_front()
-            if in_range[current] >= water_trap_range:
-                continue
-            for n in board.get_accessible_neighbors(current):
-                if not in_range.has(n):
-                    in_range[n] = in_range[current] + 1
-                    queue.append(n)
+    var in_range = _get_cells_in_range(characters[caster_id].current_coord, water_trap_range)
     for coord in in_range.keys():
         var cell = board.get_cell(coord)
         if cell and cell.cell_type == Enums.CellType.NORMAL:
@@ -243,6 +255,119 @@ func get_water_trap_targets(caster_id: String) -> Array[Vector2i]:
 ## 指定マスに水魔術トラップを設置できるか
 func can_place_water_trap(caster_id: String, target_coord: Vector2i) -> bool:
     return get_water_trap_targets(caster_id).has(target_coord)
+
+## ID からユニット（CharacterData / EnemyData）を取得。存在しなければ null
+func get_unit(unit_id: String):
+    if characters.has(unit_id):
+        return characters[unit_id]
+    if enemies.has(unit_id):
+        return enemies[unit_id]
+    return null
+
+## 指定座標に、指定ユニット以外の生存ユニット（味方・魔女）がいるか
+func _is_occupied_by_other(coord: Vector2i, unit_id: String) -> bool:
+    for c in characters.values():
+        if c.character_id != unit_id and c.is_alive and c.current_coord == coord:
+            return true
+    for e in enemies.values():
+        if e.enemy_id != unit_id and e.is_alive and e.current_coord == coord:
+            return true
+    return false
+
+## 風魔術の吹き飛び結果を計算する（状態は変更しない）
+## 戻り値: {"path": Array[Vector2i]（出発点〜着地点）, "to": 着地点, "captured_by": 捕縛した魔女ID（なければ ""）}
+## - 通路がつながっている限りまっすぐ進む。途中のマス効果（水罠など）は無視する
+## - 主人公・少女が魔女のいるマスに入ったらそこで止まり捕縛される。それ以外のユニット同士はすり抜ける
+## - 着地マスが埋まっていれば、空いているマスまで1マスずつ手前に戻る
+func compute_wind_blow(unit_id: String, dir: Vector2i) -> Dictionary:
+    var path: Array[Vector2i] = []
+    var unit = get_unit(unit_id)
+    if unit == null or board == null or not WIND_DIRECTIONS.has(dir):
+        return {"path": path, "to": Vector2i.ZERO, "captured_by": ""}
+    var is_character = characters.has(unit_id)
+    var current: Vector2i = unit.current_coord
+    path.append(current)
+    var captured_by = ""
+    while true:
+        var cell = board.get_cell(current)
+        var next_coord = current + dir
+        if cell == null or not cell.connections.get(dir, false) or not board.has_cell(next_coord):
+            break
+        current = next_coord
+        path.append(current)
+        if is_character:
+            for e in enemies.values():
+                if e.is_alive and e.current_coord == current:
+                    captured_by = e.enemy_id
+                    break
+            if not captured_by.is_empty():
+                break
+    if captured_by.is_empty():
+        while path.size() > 1 and _is_occupied_by_other(path[-1], unit_id):
+            path.pop_back()
+    return {"path": path, "to": path[-1], "captured_by": captured_by}
+
+## 風魔術で指定ユニットを飛ばせる方向一覧（1マス以上動ける方向のみ）
+func get_wind_directions(unit_id: String) -> Array[Vector2i]:
+    var dirs: Array[Vector2i] = []
+    for d in WIND_DIRECTIONS:
+        var blow = compute_wind_blow(unit_id, d)
+        if blow["path"].size() > 1:
+            dirs.append(d)
+    return dirs
+
+## 風魔術の対象にできるユニットID一覧
+## 射程内にいる生存中の主人公・少女・魔女で、1方向以上に飛ばせるもの。潜行中は対象外（詠唱者自身は詠唱で地上に出るため可）
+func get_wind_targets(caster_id: String) -> Array[String]:
+    var targets: Array[String] = []
+    if board == null or not characters.has(caster_id) or not characters[caster_id].is_alive:
+        return targets
+    var in_range = _get_cells_in_range(characters[caster_id].current_coord, wind_range)
+    for c in characters.values():
+        if not c.is_alive or (c.is_burrowed and c.character_id != caster_id):
+            continue
+        if in_range.has(c.current_coord) and not get_wind_directions(c.character_id).is_empty():
+            targets.append(c.character_id)
+    for e in enemies.values():
+        if e.is_alive and in_range.has(e.current_coord) and not get_wind_directions(e.enemy_id).is_empty():
+            targets.append(e.enemy_id)
+    return targets
+
+## 風魔術の実行：対象ユニットを指定方向の最遠マスへ吹き飛ばす（着地マスの効果は発動しない）
+## 戻り値: {"result": "BLOWN" | "GIRL_DIED" | "GAME_OVER" | "ERROR", "unit_id", "path", "to"}
+func execute_wind(caster_id: String, unit_id: String, dir: Vector2i) -> Dictionary:
+    if not characters.has(caster_id):
+        DebugLogger.error("TurnManager.execute_wind", "詠唱者が存在しません", {"id": caster_id})
+        return {"result": "ERROR"}
+    var caster = characters[caster_id]
+    if not caster.is_alive or caster.has_acted:
+        DebugLogger.warn("TurnManager.execute_wind", "詠唱者は死亡中または行動済みです", {"id": caster_id})
+        return {"result": "ERROR"}
+    if not get_wind_targets(caster_id).has(unit_id):
+        DebugLogger.warn("TurnManager.execute_wind", "指定ユニットは風魔術の対象にできません", {"unit_id": unit_id})
+        return {"result": "ERROR"}
+    if not get_wind_directions(unit_id).has(dir):
+        DebugLogger.warn("TurnManager.execute_wind", "指定方向には吹き飛ばせません", {"unit_id": unit_id, "dir": dir})
+        return {"result": "ERROR"}
+
+    caster.is_burrowed = false
+    var blow = compute_wind_blow(unit_id, dir)
+    var unit = get_unit(unit_id)
+    unit.current_coord = blow["to"]
+    caster.has_acted = true
+    emit_signal("magic_executed", Enums.ElementType.WIND, caster_id, blow["to"])
+
+    var result = "BLOWN"
+    if not blow["captured_by"].is_empty():
+        if unit_id == "HERO":
+            current_phase = Enums.TurnPhase.GAME_OVER
+            emit_signal("game_over_triggered", "吹き飛ばされた先で魔女に捕縛された")
+            result = "GAME_OVER"
+        else:
+            unit.kill()
+            emit_signal("unit_killed", unit_id)
+            result = "GIRL_DIED"
+    return {"result": result, "unit_id": unit_id, "path": blow["path"], "to": blow["to"], "captured_by": blow["captured_by"]}
 
 ## 魔女の復活時捕縛判定：復活位置にいる地上のキャラを捕縛する（潜行中はやり過ごし）
 ## 主人公を捕縛した場合は GAME_OVER へ遷移し true を返す

@@ -38,6 +38,16 @@ var is_enemy_turn: bool = false
 var suspend_btn: Button = null
 var is_selecting_water_target: bool = false   ## 水魔術の設置先を選択中
 var water_target_cells: Array[Vector2i] = []
+enum WindSelect { NONE, TARGET, DIRECTION }
+var wind_select_state: WindSelect = WindSelect.NONE  ## 風魔術の選択段階
+var wind_target_ids: Array[String] = []
+var wind_target_id: String = ""
+var wind_landing_map: Dictionary = {}   ## 着地マス -> 方向
+var moving_piece_id: String = ""        ## 移動アニメ中のピース（空なら操作中キャラ）
+
+## 魔法の対象・設置先を選択中か（コマンドメニュー表示・中断セーブを止める）
+func _is_selecting_magic_target() -> bool:
+	return is_selecting_water_target or wind_select_state != WindSelect.NONE
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -389,7 +399,7 @@ func _find_alive_enemies_in_range(origin_coord: Vector2i, max_distance: int) -> 
 	return result
 
 func _show_action_command_menu(custom_mouse_pos: Vector2 = Vector2.ZERO) -> void:
-	if is_moving or current_dice_roll > 0 or is_selecting_water_target:
+	if is_moving or current_dice_roll > 0 or _is_selecting_magic_target():
 		return
 	if tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
 		return
@@ -435,8 +445,8 @@ func _show_action_command_menu(custom_mouse_pos: Vector2 = Vector2.ZERO) -> void
 		magic_desc = "選んだマスに水魔術トラップを設置" if can_magic else "水魔術トラップを置けるマスがありません"
 	elif unit.available_magics.has(Enums.ElementType.WIND):
 		magic_name = "風魔術"
-		magic_desc = "直線の魔女または自分を吹き飛ばす"
-		can_magic = true
+		can_magic = not tm.get_wind_targets(current_acting_unit_id).is_empty()
+		magic_desc = "選んだユニットを直線の最も遠いマスまで吹き飛ばす" if can_magic else "吹き飛ばせるユニットがいません"
 	elif unit.available_magics.has(Enums.ElementType.EARTH):
 		magic_name = "土魔術"
 		magic_desc = "地中に潜行して魔女をやり過ごす"
@@ -552,6 +562,11 @@ func _on_roll_dice() -> void:
 	DebugLogger.info("MainGame._on_roll_dice", "%s ダイス出目 %d (到達可能マス: %d箇所)" % [unit.name, current_dice_roll, reachable_cells.size()])
 
 func _on_cell_hovered(coord: Vector2i) -> void:
+	if not is_moving and wind_select_state == WindSelect.DIRECTION:
+		# 風魔術の着地マス上：吹き飛ぶ経路をプレビュー
+		if wind_landing_map.has(coord):
+			board_view.update_route_preview(tm.compute_wind_blow(wind_target_id, wind_landing_map[coord])["path"])
+		return
 	if is_moving or current_dice_roll <= 0:
 		return
 	if reachable_cells.has(coord):
@@ -607,12 +622,8 @@ func _on_magic_pressed() -> void:
 		_on_unit_action_finished(current_acting_unit_id)
 		
 	elif unit.available_magics.has(Enums.ElementType.WIND):
-		if piece:
-			piece.set_burrowed(false)
-		unit.has_acted = true
-		hud.log_message("[Magic] %s が風魔術を行使しました。" % unit.name)
-		_on_unit_action_finished(current_acting_unit_id)
-		
+		_begin_wind_target_selection()
+
 	else:
 		DebugLogger.warn("MainGame._on_magic_pressed", "使用可能な魔法がありません", {"unit_id": current_acting_unit_id})
 		_show_action_command_menu()
@@ -655,6 +666,106 @@ func _place_water_trap(coord: Vector2i) -> void:
 	hud.log_message("[Magic] 【水魔術】発動！%s が座標 %s を水トラップマスに変化させました。" % [unit.name, str(coord)])
 	_on_unit_action_finished(current_acting_unit_id)
 
+## 風魔術：対象にできるユニットのマスをハイライトし、対象選択モードへ入る
+func _begin_wind_target_selection() -> void:
+	wind_target_ids = tm.get_wind_targets(current_acting_unit_id)
+	if wind_target_ids.is_empty():
+		DebugLogger.warn("MainGame._begin_wind_target_selection", "風魔術で吹き飛ばせるユニットがいません")
+		_end_wind_selection()
+		_show_action_command_menu()
+		return
+	wind_select_state = WindSelect.TARGET
+	wind_target_id = ""
+	wind_landing_map.clear()
+	board_view.clear_highlights()
+	board_view.clear_route_preview()
+	for uid in wind_target_ids:
+		var u = tm.get_unit(uid)
+		if u:
+			board_view.set_cell_highlight(u.current_coord, true, Color(0.4, 1.0, 0.6, 0.9))
+	var caster = tm.characters[current_acting_unit_id]
+	hud.update_turn_info(tm.current_turn, "【%s】風魔術で吹き飛ばすユニットをクリック [右クリック: 戻る]" % caster.name)
+	hud.set_action_buttons_enabled(false)
+
+## 風魔術：指定ユニットの着地マス（方向ごと）をハイライトし、方向選択モードへ入る
+func _begin_wind_direction_selection(unit_id: String) -> void:
+	wind_select_state = WindSelect.DIRECTION
+	wind_target_id = unit_id
+	wind_landing_map.clear()
+	board_view.clear_highlights()
+	board_view.clear_route_preview()
+	var u = tm.get_unit(unit_id)
+	if u:
+		board_view.set_cell_highlight(u.current_coord, true, Color(0.4, 1.0, 0.6, 0.9))
+	for d in tm.get_wind_directions(unit_id):
+		var blow = tm.compute_wind_blow(unit_id, d)
+		wind_landing_map[blow["to"]] = d
+		board_view.set_cell_highlight(blow["to"], true, Color(1.0, 0.6, 0.2, 0.9))
+	hud.update_turn_info(tm.current_turn, "吹き飛ばす先（着地マス）をクリック [右クリック: 対象選択へ戻る]")
+
+## 風魔術：選択を終了する（ハイライト・経路プレビュー解除）
+func _end_wind_selection() -> void:
+	wind_select_state = WindSelect.NONE
+	wind_target_ids.clear()
+	wind_target_id = ""
+	wind_landing_map.clear()
+	board_view.clear_highlights()
+	board_view.clear_route_preview()
+
+## 風魔術：クリックしたマスにいる対象ユニットIDを返す（いなければ ""）
+func _find_wind_target_at(coord: Vector2i) -> String:
+	for uid in wind_target_ids:
+		var u = tm.get_unit(uid)
+		if u and u.current_coord == coord:
+			return uid
+	return ""
+
+## 風魔術：盤面クリック時の処理（対象選択 / 着地マス選択）
+func _on_wind_cell_clicked(coord: Vector2i) -> void:
+	if wind_select_state == WindSelect.DIRECTION and wind_landing_map.has(coord):
+		_execute_wind(wind_landing_map[coord])
+		return
+	var uid = _find_wind_target_at(coord)
+	if not uid.is_empty():
+		_begin_wind_direction_selection(uid)
+	else:
+		DebugLogger.warn("MainGame._on_wind_cell_clicked", "風魔術の対象・着地マスではありません", {"clicked_coord": coord})
+
+## 風魔術：選んだ方向へ吹き飛ばし、アニメーション後に行動終了
+func _execute_wind(dir: Vector2i) -> void:
+	var target_id = wind_target_id
+	var caster = tm.characters[current_acting_unit_id]
+	_end_wind_selection()
+	var res = tm.execute_wind(current_acting_unit_id, target_id, dir)
+	if res.get("result") == "ERROR":
+		hud.log_message("[Magic] 風魔術を発動できませんでした。")
+		_show_action_command_menu()
+		return
+	var caster_piece = board_view.get_piece(current_acting_unit_id)
+	if caster_piece:
+		caster_piece.set_burrowed(false)
+	var target_unit = tm.get_unit(target_id)
+	var t_name = target_unit.name if target_id in tm.characters else target_id
+	hud.log_message("[Magic] 【風魔術】発動！%s が %s を %s まで吹き飛ばしました。" % [caster.name, t_name, str(res["to"])])
+	if res.get("result") == "GIRL_DIED" or res.get("result") == "GAME_OVER":
+		hud.log_message("[Magic] %s は吹き飛ばされた先で魔女にぶつかった！" % t_name)
+
+	var piece = board_view.get_piece(target_id)
+	var finish = func():
+		is_moving = false
+		moving_piece_id = ""
+		if piece:
+			piece.position = Vector2(res["to"].x * 64 + 16, res["to"].y * 64 + 16)
+		if tm.current_phase != Enums.TurnPhase.GAME_OVER:
+			_on_unit_action_finished(current_acting_unit_id)
+	if piece == null:
+		finish.call()
+		return
+	is_moving = true
+	moving_piece_id = target_id
+	selected_path = res["path"]
+	piece.animate_path(res["path"], func(_c: Vector2i, _r: int): return {"result": "CONTINUE"}, finish)
+
 func _on_wait_pressed() -> void:
 	if is_moving:
 		DebugLogger.warn("MainGame._on_wait_pressed", "コマ移動中のため待機できません")
@@ -674,7 +785,7 @@ func _on_wait_pressed() -> void:
 
 func _on_cell_clicked(coord: Vector2i) -> void:
 	if is_moving:
-		var p = board_view.get_piece(current_acting_unit_id)
+		var p = board_view.get_piece(moving_piece_id if not moving_piece_id.is_empty() else current_acting_unit_id)
 		if p and selected_path.size() > 0:
 			p.skip_current_move(selected_path[-1])
 			DebugLogger.info("MainGame._on_cell_clicked", "クリックにより移動アニメーションをスキップ")
@@ -685,6 +796,10 @@ func _on_cell_clicked(coord: Vector2i) -> void:
 			_place_water_trap(coord)
 		else:
 			DebugLogger.warn("MainGame._on_cell_clicked", "水魔術トラップを設置できないマスです", {"clicked_coord": coord})
+		return
+
+	if wind_select_state != WindSelect.NONE:
+		_on_wind_cell_clicked(coord)
 		return
 
 	if current_dice_roll <= 0:
@@ -743,6 +858,18 @@ func _go_back() -> void:
 		hud.set_action_buttons_enabled(true)
 		_show_action_command_menu(mouse_pos)
 		DebugLogger.info("MainGame._go_back", "水魔術の設置先選択を取りやめてコマンドメニューへ復帰")
+		return
+
+	# 3-1. 風魔術の選択中の場合：着地マス選択→対象選択→コマンドメニューの順に1つずつ戻る
+	if wind_select_state == WindSelect.DIRECTION:
+		_begin_wind_target_selection()
+		DebugLogger.info("MainGame._go_back", "風魔術の着地マス選択から対象選択へ戻る")
+		return
+	if wind_select_state == WindSelect.TARGET:
+		_end_wind_selection()
+		hud.set_action_buttons_enabled(true)
+		_show_action_command_menu(mouse_pos)
+		DebugLogger.info("MainGame._go_back", "風魔術の対象選択を取りやめてコマンドメニューへ復帰")
 		return
 
 	# 3-2. 移動先選択中（出目確定後）の場合：出目キャンセルは不可（移動必須）
@@ -1001,7 +1128,7 @@ func _can_suspend_save() -> bool:
 		return false
 	if tm.current_phase != Enums.TurnPhase.PLAYER_ACTION_SELECT:
 		return false
-	if current_dice_roll > 0 or has_pending_additional_move or has_pending_roll_again or is_selecting_water_target:
+	if current_dice_roll > 0 or has_pending_additional_move or has_pending_roll_again or _is_selecting_magic_target():
 		return false
 	if game_over_screen.visible or stage_clear_screen.visible or item_select_modal.visible:
 		return false
